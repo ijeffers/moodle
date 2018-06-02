@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -18,7 +17,7 @@
 /**
  * Strings for component 'block', language 'en', branch 'MOODLE_20_STABLE'
  *
- * @package   block
+ * @package   core_block
  * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -27,6 +26,7 @@ $string['addtodock'] = 'Move this to the dock';
 $string['anypagematchingtheabove'] = 'Any page matching the above';
 $string['appearsinsubcontexts'] = 'Appears in sub-contexts';
 $string['assignrolesinblock'] = 'Assign roles in {$a} block';
+$string['blocksdrawertoggle'] = 'Hide/show blocks drawer';
 $string['blocksettings'] = 'Block settings';
 $string['bracketfirst'] = '{$a} (first)';
 $string['bracketlast'] = '{$a} (last)';
@@ -52,9 +52,14 @@ $string['moveblockafter'] = 'Move block to after {$a} block';
 $string['moveblockbefore'] = 'Move block to before {$a} block';
 $string['moveblockinregion'] = 'Move block to {$a} region';
 $string['movingthisblockcancel'] = 'Moving this block ({$a})';
+$string['myblocks'] = 'My blocks';
 $string['onthispage'] = 'On this page';
 $string['pagetypes'] = 'Page types';
 $string['pagetypewarning'] = 'The previously specified page type is no longer selectable. Please choose the most appropriate page type below.';
+$string['privacy:metadata:userpref:dockedinstance'] = 'Records when the user docked a block';
+$string['privacy:metadata:userpref:hiddenblock'] = 'Records when the user collapsed/hid a block';
+$string['privacy:request:blockisdocked'] = 'Indicates whether the block was docked';
+$string['privacy:request:blockishidden'] = 'Indicates whether the block was hidden/collapsed';
 $string['region'] = 'Region';
 $string['showblock'] = 'Show {$a} block';
 $string['showoncontextandsubs'] = 'Display on \'{$a}\' and any pages within it';

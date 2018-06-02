@@ -15,8 +15,7 @@ Feature: A user can control their own subscription preferences for a forum
       | user | course | role |
       | student1 | C1 | student |
     And I log in as "admin"
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
 
   Scenario: A disallowed subscription forum cannot be subscribed to
     Given I add a "Forum" to section "1" and I fill the form with:
@@ -29,12 +28,12 @@ Feature: A user can control their own subscription preferences for a forum
       | Message | Test post message |
     And I log out
     When I log in as "student1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test forum name"
     Then I should not see "Subscribe to this forum"
     And I should not see "Unsubscribe from this forum"
     And "You are subscribed to this discussion. Click to unsubscribe." "link" should not exist in the "Test post subject" "table_row"
-    And "Not subscribed. Click to subscribe." "link" should not exist in the "Test post subject" "table_row"
+    And "You are not subscribed to this discussion. Click to subscribe." "link" should not exist in the "Test post subject" "table_row"
 
   Scenario: A forced subscription forum cannot be subscribed to
     Given I add a "Forum" to section "1" and I fill the form with:
@@ -47,12 +46,12 @@ Feature: A user can control their own subscription preferences for a forum
       | Message | Test post message |
     And I log out
     When I log in as "student1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test forum name"
     Then I should not see "Subscribe to this forum"
     And I should not see "Unsubscribe from this forum"
     And "You are subscribed to this discussion. Click to unsubscribe." "link" should not exist in the "Test post subject" "table_row"
-    And "Not subscribed. Click to subscribe." "link" should not exist in the "Test post subject" "table_row"
+    And "You are not subscribed to this discussion. Click to subscribe." "link" should not exist in the "Test post subject" "table_row"
 
   Scenario: An optional forum can be subscribed to
     Given I add a "Forum" to section "1" and I fill the form with:
@@ -65,12 +64,12 @@ Feature: A user can control their own subscription preferences for a forum
       | Message | Test post message |
     And I log out
     When I log in as "student1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test forum name"
     Then I should see "Subscribe to this forum"
     And I should not see "Unsubscribe from this forum"
     And I follow "Subscribe to this forum"
-    And I follow "Continue"
+    And I should see "Student One will be notified of new posts in 'Test forum name'"
     And I should see "Unsubscribe from this forum"
     And I should not see "Subscribe to this forum"
 
@@ -85,11 +84,11 @@ Feature: A user can control their own subscription preferences for a forum
       | Message | Test post message |
     And I log out
     When I log in as "student1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test forum name"
     Then I should see "Unsubscribe from this forum"
     And I should not see "Subscribe to this forum"
     And I follow "Unsubscribe from this forum"
-    And I follow "Continue"
+    And I should see "Student One will NOT be notified of new posts in 'Test forum name'"
     And I should see "Subscribe to this forum"
     And I should not see "Unsubscribe from this forum"

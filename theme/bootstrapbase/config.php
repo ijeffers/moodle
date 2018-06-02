@@ -35,7 +35,6 @@ $THEME->yuicssmodules = array();
 $THEME->name = 'bootstrapbase';
 $THEME->parents = array();
 $THEME->sheets = array('moodle');
-$THEME->supportscssoptimisation = false;
 $THEME->enable_dock = false;
 $THEME->editor_sheets = array('editor');
 
@@ -93,8 +92,8 @@ $THEME->layouts = array(
     ),
     // My public page.
     'mypublic' => array(
-        'file' => 'columns3.php',
-        'regions' => array('side-pre', 'side-post'),
+        'file' => 'columns2.php',
+        'regions' => array('side-pre'),
         'defaultregion' => 'side-pre',
     ),
     'login' => array(
@@ -163,8 +162,3 @@ if (core_useragent::is_ie() && !core_useragent::check_ie_version('9.0')) {
 }
 
 $THEME->hidefromselector = true;
-
-$THEME->blockrtlmanipulations = array(
-    'side-pre' => 'side-post',
-    'side-post' => 'side-pre'
-);

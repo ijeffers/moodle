@@ -68,7 +68,7 @@ if ($course->id != SITEID) {
     require_login($course, true, null, false);
 
 } else if ($CFG->forcelogin) {
-    if (!empty($CFG->sitepolicy)
+    if (empty($CFG->sitepolicyhandler) and !empty($CFG->sitepolicy)
         and ($CFG->sitepolicy == $CFG->wwwroot.'/file.php/'.$relativepath
              or $CFG->sitepolicy == $CFG->wwwroot.'/file.php?file=/'.$relativepath)) {
         //do not require login for policy file
@@ -87,7 +87,8 @@ if (!$file = $fs->get_file_by_hash(sha1($fullpath))) {
     if (strrpos($fullpath, '/') !== strlen($fullpath) -1 ) {
         $fullpath .= '/';
     }
-    if (!$file = $fs->get_file_by_hash(sha1($fullpath.'/.'))) {
+    // Try to fallback to the directory named as the supposed file.
+    if (!$file = $fs->get_file_by_hash(sha1($fullpath.'.'))) {
         send_file_not_found();
     }
 }

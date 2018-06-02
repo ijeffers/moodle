@@ -51,9 +51,50 @@
 
             var typeSelector = Y.one('#id_typeid');
             typeSelector.on('change', function(e){
+                // Reset configuration fields when another preconfigured tool is selected.
+                self.resetToolFields();
+
                 updateToolMatches();
 
                 self.toggleEditButtons();
+
+                if (self.getSelectedToolTypeOption().getAttribute('toolproxy')){
+                    var allowname = Y.one('#id_instructorchoicesendname');
+                    allowname.set('checked', !self.getSelectedToolTypeOption().getAttribute('noname'));
+
+                    var allowemail = Y.one('#id_instructorchoicesendemailaddr');
+                    allowemail.set('checked', !self.getSelectedToolTypeOption().getAttribute('noemail'));
+
+                    var allowgrades = Y.one('#id_instructorchoiceacceptgrades');
+                    allowgrades.set('checked', !self.getSelectedToolTypeOption().getAttribute('nogrades'));
+                    self.toggleGradeSection();
+                }
+            });
+
+            var contentItemButton = Y.one('[name="selectcontent"]');
+            var contentItemUrl = contentItemButton.getAttribute('data-contentitemurl');
+            // Handle configure from link button click.
+            contentItemButton.on('click', function() {
+                var contentItemId = self.getContentItemId();
+                if (contentItemId) {
+                    // Get activity name and description values.
+                    var title = Y.one('#id_name').get('value').trim();
+                    var text = Y.one('#id_introeditor').get('value').trim();
+
+                    // Set data to be POSTed.
+                    var postData = {
+                        id: contentItemId,
+                        course: self.settings.courseId,
+                        title: title,
+                        text: text
+                    };
+
+                    require(['mod_lti/contentitem'], function(contentitem) {
+                        contentitem.init(contentItemUrl, postData, function() {
+                            M.mod_lti.editor.toggleGradeSection();
+                        });
+                    });
+                }
             });
 
             this.createTypeEditorButtons();
@@ -138,10 +179,10 @@
                 var domainRegex = /(?:https?:\/\/)?(?:www\.)?([^\/]+)(?:\/|$)/i;
                 var match = domainRegex.exec(url);
                 if(match && match[1] && match[1].toLowerCase() === selectedOption.getAttribute('domain').toLowerCase()){
-                    automatchToolDisplay.set('innerHTML',  '<img style="vertical-align:text-bottom" src="' + self.settings.green_check_icon_url + '" />' + M.str.lti.using_tool_configuration + selectedOption.get('text'));
+                    automatchToolDisplay.set('innerHTML',  '<img style="vertical-align:text-bottom" src="' + self.settings.green_check_icon_url + '" />' + M.util.get_string('using_tool_configuration', 'lti') + selectedOption.get('text'));
                 } else {
                     // The entered URL does not match the domain of the tool configuration
-                    automatchToolDisplay.set('innerHTML', '<img style="vertical-align:text-bottom" src="' + self.settings.warning_icon_url + '" />' + M.str.lti.domain_mismatch);
+                    automatchToolDisplay.set('innerHTML', '<img style="vertical-align:text-bottom" src="' + self.settings.warning_icon_url + '" />' + M.util.get_string('domain_mismatch', 'lti'));
                 }
             }
 
@@ -151,7 +192,7 @@
             // Indicate the tool is manually configured
             // We still check the Launch URL with the server as course/site tools may override privacy settings
             if(key.get('value') !== '' && secret.get('value') !== ''){
-                automatchToolDisplay.set('innerHTML',  '<img style="vertical-align:text-bottom" src="' + self.settings.green_check_icon_url + '" />' + M.str.lti.custom_config);
+                automatchToolDisplay.set('innerHTML',  '<img style="vertical-align:text-bottom" src="' + self.settings.green_check_icon_url + '" />' + M.util.get_string('custom_config', 'lti'));
             }
 
             var continuation = function(toolInfo, inputfield){
@@ -159,12 +200,16 @@
                     self.updatePrivacySettings(toolInfo);
                 }
                 if(toolInfo.toolname){
-                    automatchToolDisplay.set('innerHTML',  '<img style="vertical-align:text-bottom" src="' + self.settings.green_check_icon_url + '" />' + M.str.lti.using_tool_configuration + toolInfo.toolname);
+                    automatchToolDisplay.set('innerHTML',  '<img style="vertical-align:text-bottom" src="' + self.settings.green_check_icon_url + '" />' + M.util.get_string('using_tool_configuration', 'lti') + toolInfo.toolname);
                 } else if(!selectedToolType) {
                     // Inform them custom configuration is in use
                     if(key.get('value') === '' || secret.get('value') === ''){
-                        automatchToolDisplay.set('innerHTML', '<img style="vertical-align:text-bottom" src="' + self.settings.warning_icon_url + '" />' + M.str.lti.tool_config_not_found);
+                        automatchToolDisplay.set('innerHTML', '<img style="vertical-align:text-bottom" src="' + self.settings.warning_icon_url + '" />' + M.util.get_string('tool_config_not_found', 'lti'));
                     }
+                }
+                if (toolInfo.cartridge) {
+                    automatchToolDisplay.set('innerHTML', '<img style="vertical-align:text-bottom" src="' + self.settings.green_check_icon_url +
+                                             '" />' + M.util.get_string('using_tool_cartridge', 'lti'));
                 }
             };
 
@@ -240,11 +285,11 @@
                     if(settingValue == M.mod_lti.LTI_SETTING_NEVER){
                         control.set('disabled', true);
                         control.set('checked', false);
-                        control.set('title', M.str.lti.forced_help);
+                        control.set('title', M.util.get_string('forced_help', 'lti'));
                     } else if(settingValue == M.mod_lti.LTI_SETTING_ALWAYS){
                         control.set('disabled', true);
                         control.set('checked', true);
-                        control.set('title', M.str.lti.forced_help);
+                        control.set('title', M.util.get_string('forced_help', 'lti'));
                     } else if(settingValue == M.mod_lti.LTI_SETTING_DELEGATE){
                         control.set('disabled', false);
 
@@ -276,11 +321,11 @@
 
                 var globalGroup = Y.Node.create('<optgroup />')
                                     .set('id', 'global_tool_group')
-                                    .set('label', M.str.lti.global_tool_types);
+                                    .set('label', M.util.get_string('global_tool_types', 'lti'));
 
                 var courseGroup = Y.Node.create('<optgroup />')
                                     .set('id', 'course_tool_group')
-                                    .set('label', M.str.lti.course_tool_types);
+                                    .set('label', M.util.get_string('course_tool_types', 'lti'));
 
                 var globalOptions = typeSelector.all('option[globalTool=1]').remove().each(function(node){
                     globalGroup.append(node);
@@ -318,9 +363,9 @@
                         .append(Y.Node.create('<img src="' + iconUrl + '" />'));
             }
 
-            var addIcon = createIcon('lti_add_tool_type', M.str.lti.addtype, this.settings.add_icon_url);
-            var editIcon = createIcon('lti_edit_tool_type', M.str.lti.edittype, this.settings.edit_icon_url);
-            var deleteIcon  = createIcon('lti_delete_tool_type', M.str.lti.deletetype, this.settings.delete_icon_url);
+            var addIcon = createIcon('lti_add_tool_type', M.util.get_string('addtype', 'lti'), this.settings.add_icon_url);
+            var editIcon = createIcon('lti_edit_tool_type', M.util.get_string('edittype', 'lti'), this.settings.edit_icon_url);
+            var deleteIcon  = createIcon('lti_delete_tool_type', M.util.get_string('deletetype', 'lti'), this.settings.delete_icon_url);
 
             editIcon.on('click', function(e){
                 var toolTypeId = typeSelector.get('value');
@@ -328,7 +373,7 @@
                 if(self.getSelectedToolTypeOption().getAttribute('editable')){
                     window.open(self.settings.instructor_tool_type_edit_url + '&action=edit&typeid=' + toolTypeId, 'edit_tool');
                 } else {
-                    alert(M.str.lti.cannot_edit);
+                    alert(M.util.get_string('cannot_edit', 'lti'));
                 }
             });
 
@@ -340,11 +385,11 @@
                 var toolTypeId = typeSelector.get('value');
 
                 if(self.getSelectedToolTypeOption().getAttribute('editable')){
-                    if(confirm(M.str.lti.delete_confirmation)){
+                    if(confirm(M.util.get_string('delete_confirmation', 'lti'))){
                         self.deleteTool(toolTypeId);
                     }
                 } else {
-                    alert(M.str.lti.cannot_delete);
+                    alert(M.util.get_string('cannot_delete', 'lti'));
                 }
             });
 
@@ -390,6 +435,14 @@
             this.clearToolCache();
             this.updateAutomaticToolMatch(Y.one('#id_toolurl'));
             this.updateAutomaticToolMatch(Y.one('#id_securetoolurl'));
+            this.toggleEditButtons();
+
+            require(["core/notification"], function (notification) {
+                notification.addNotification({
+                    message: M.util.get_string('tooltypeadded', 'lti'),
+                    type: "success"
+                });
+            });
         },
 
         updateToolType: function(toolType){
@@ -403,6 +456,13 @@
             this.clearToolCache();
             this.updateAutomaticToolMatch(Y.one('#id_toolurl'));
             this.updateAutomaticToolMatch(Y.one('#id_securetoolurl'));
+
+            require(["core/notification"], function (notification) {
+                notification.addNotification({
+                    message: M.util.get_string('tooltypeupdated', 'lti'),
+                    type: "success"
+                });
+            });
         },
 
         deleteTool: function(toolTypeId){
@@ -417,9 +477,21 @@
                         self.clearToolCache();
                         self.updateAutomaticToolMatch(Y.one('#id_toolurl'));
                         self.updateAutomaticToolMatch(Y.one('#id_securetoolurl'));
+
+                        require(["core/notification"], function (notification) {
+                            notification.addNotification({
+                                message: M.util.get_string('tooltypedeleted', 'lti'),
+                                type: "success"
+                            });
+                        });
                     },
                     failure: function(){
-
+                        require(["core/notification"], function (notification) {
+                            notification.addNotification({
+                                message: M.util.get_string('tooltypenotdeleted', 'lti'),
+                                type: "problem"
+                            });
+                        });
                     }
                 }
             });
@@ -448,7 +520,31 @@
                     }
                 }
             });
-        }
+        },
 
+        /**
+         * Gets the tool type ID of the selected tool that supports Content-Item selection.
+         *
+         * @returns {number|boolean} The ID of the tool type if it supports Content-Item selection. False, otherwise.
+         */
+        getContentItemId: function() {
+            var selected = this.getSelectedToolTypeOption();
+            if (selected.getAttribute('data-contentitem')) {
+                return selected.getAttribute('data-id');
+            }
+            return false;
+        },
+
+        /**
+         * Resets the values of fields related to the LTI tool settings.
+         */
+        resetToolFields: function() {
+            // Reset values for all text fields.
+            var fields = Y.all('#id_toolurl, #id_securetoolurl, #id_instructorcustomparameters, #id_icon, #id_secureicon');
+            fields.set('value', null);
+
+            // Reset value for launch container select box.
+            Y.one('#id_launchcontainer').set('value', 1);
+        }
     };
 })();

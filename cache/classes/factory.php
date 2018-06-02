@@ -126,8 +126,8 @@ class cache_factory {
                 // situation. It will use disabled alternatives where available.
                 require_once($CFG->dirroot.'/cache/disabledlib.php');
                 self::$instance = new cache_factory_disabled();
-            } else if (defined('PHPUNIT_TEST') && PHPUNIT_TEST) {
-                // We're using the regular factory.
+            } else if ((defined('PHPUNIT_TEST') && PHPUNIT_TEST) || defined('BEHAT_SITE_RUNNING')) {
+                // We're using the test factory.
                 require_once($CFG->dirroot.'/cache/tests/fixtures/lib.php');
                 self::$instance = new cache_phpunit_factory();
                 if (defined('CACHE_DISABLE_STORES') && CACHE_DISABLE_STORES !== false) {
@@ -161,6 +161,7 @@ class cache_factory {
         $factory->reset_cache_instances();
         $factory->configs = array();
         $factory->definitions = array();
+        $factory->definitionstores = array();
         $factory->lockplugins = array(); // MUST be null in order to force its regeneration.
         // Reset the state to uninitialised.
         $factory->state = self::STATE_UNINITIALISED;
@@ -186,19 +187,22 @@ class cache_factory {
      * @param string $component
      * @param string $area
      * @param array $identifiers
-     * @param string $aggregate
+     * @param string $unused Used to be data source aggregate however that was removed and this is now unused.
      * @return cache_application|cache_session|cache_request
      */
-    public function create_cache_from_definition($component, $area, array $identifiers = array(), $aggregate = null) {
-        $definitionname = $component.'/'.$area;
+    public function create_cache_from_definition($component, $area, array $identifiers = array(), $unused = null) {
+        $identifierstring = empty($identifiers) ? '' : '/'.http_build_query($identifiers);
+        $definitionname = $component.'/'.$area.$identifierstring;
         if (isset($this->cachesfromdefinitions[$definitionname])) {
             $cache = $this->cachesfromdefinitions[$definitionname];
-            $cache->set_identifiers($identifiers);
             return $cache;
         }
-        $definition = $this->create_definition($component, $area, $aggregate);
-        $definition->set_identifiers($identifiers);
-        $cache = $this->create_cache($definition, $identifiers);
+        $definition = $this->create_definition($component, $area);
+        // Identifiers are cached as part of the cache creation, so we store a cloned version of the cache.
+        $cacheddefinition = clone($definition);
+        $cacheddefinition->set_identifiers($identifiers);
+        $cache = $this->create_cache($cacheddefinition);
+
         // Loaders are always held onto to speed up subsequent requests.
         $this->cachesfromdefinitions[$definitionname] = $cache;
         return $cache;
@@ -221,13 +225,17 @@ class cache_factory {
      * @return cache_application|cache_session|cache_request
      */
     public function create_cache_from_params($mode, $component, $area, array $identifiers = array(), array $options = array()) {
-        $key = "{$mode}_{$component}_{$area}";
-        if (array_key_exists($key, $this->cachesfromparams)) {
+        $identifierstring = empty($identifiers) ? '' : '_'.http_build_query($identifiers);
+        $key = "{$mode}_{$component}_{$area}{$identifierstring}";
+        if (isset($this->cachesfromparams[$key])) {
             return $this->cachesfromparams[$key];
         }
+        // Regular cache definitions are cached inside create_definition().  This is not the case for Adhoc definitions
+        // using load_adhoc().  They are built as a new object on each call.
+        // We do not need to clone the definition because we know it's new.
         $definition = cache_definition::load_adhoc($mode, $component, $area, $options);
         $definition->set_identifiers($identifiers);
-        $cache = $this->create_cache($definition, $identifiers);
+        $cache = $this->create_cache($definition);
         $this->cachesfromparams[$key] = $cache;
         return $cache;
     }
@@ -277,6 +285,9 @@ class cache_factory {
         if (!array_key_exists($name, $this->stores)) {
             // Properties: name, plugin, configuration, class.
             $class = $details['class'];
+            if (!$class::are_requirements_met()) {
+                return false;
+            }
             $store = new $class($details['name'], $details['configuration']);
             $this->stores[$name] = $store;
         }
@@ -325,6 +336,15 @@ class cache_factory {
     }
 
     /**
+     * Gets all adhoc caches that have been used within this request.
+     *
+     * @return cache_store[] Caches currently in use
+     */
+    public function get_adhoc_caches_in_use() {
+        return $this->cachesfromparams;
+    }
+
+    /**
      * Creates a cache config instance with the ability to write if required.
      *
      * @param bool $writer If set to true an instance that can update the configuration will be returned.
@@ -335,16 +355,17 @@ class cache_factory {
 
         // The class to use.
         $class = 'cache_config';
-        $unittest = defined('PHPUNIT_TEST') && PHPUNIT_TEST;
+        // Are we running tests of some form?
+        $testing = (defined('PHPUNIT_TEST') && PHPUNIT_TEST) || defined('BEHAT_SITE_RUNNING');
 
         // Check if this is a PHPUnit test and redirect to the phpunit config classes if it is.
-        if ($unittest) {
+        if ($testing) {
             require_once($CFG->dirroot.'/cache/locallib.php');
             require_once($CFG->dirroot.'/cache/tests/fixtures/lib.php');
             // We have just a single class for PHP unit tests. We don't care enough about its
             // performance to do otherwise and having a single method allows us to inject things into it
             // while testing.
-            $class = 'cache_config_phpunittest';
+            $class = 'cache_config_testing';
         }
 
         // Check if we need to create a config file with defaults.
@@ -352,7 +373,7 @@ class cache_factory {
 
         if ($writer || $needtocreate) {
             require_once($CFG->dirroot.'/cache/locallib.php');
-            if (!$unittest) {
+            if (!$testing) {
                 $class .= '_writer';
             }
         }
@@ -392,14 +413,13 @@ class cache_factory {
      * Creates a definition instance or returns the existing one if it has already been created.
      * @param string $component
      * @param string $area
-     * @param string $aggregate
+     * @param string $unused This used to be data source aggregate - however that functionality has been removed and
+     *        this argument is now unused.
      * @return cache_definition
+     * @throws coding_exception If the definition cannot be found.
      */
-    public function create_definition($component, $area, $aggregate = null) {
+    public function create_definition($component, $area, $unused = null) {
         $id = $component.'/'.$area;
-        if ($aggregate) {
-            $id .= '::'.$aggregate;
-        }
         if (!isset($this->definitions[$id])) {
             // This is the first time this definition has been requested.
             if ($this->is_initialising()) {
@@ -421,13 +441,6 @@ class cache_factory {
                         // To serve this purpose and avoid errors we are going to make use of an ad-hoc cache rather than
                         // search for the definition which would possibly cause an infitite loop trying to initialise the cache.
                         $definition = cache_definition::load_adhoc(cache_store::MODE_REQUEST, $component, $area);
-                        if ($aggregate !== null) {
-                            // If you get here you deserve a warning. We have to use an ad-hoc cache here, so we can't find the definition and therefor
-                            // can't find any information about the datasource or any of its aggregated.
-                            // Best of luck.
-                            debugging('An unknown cache was requested during development with an aggregate that could not be loaded. Ad-hoc cache used instead.', DEBUG_DEVELOPER);
-                            $aggregate = null;
-                        }
                     } else {
                         // Either a typo of the developer has just created the definition and is using it for the first time.
                         $this->reset();
@@ -440,10 +453,10 @@ class cache_factory {
                             debugging('Cache definitions reparsed causing cache reset in order to locate definition.
                                 You should bump the version number to ensure definitions are reprocessed.', DEBUG_DEVELOPER);
                         }
-                        $definition = cache_definition::load($id, $definition, $aggregate);
+                        $definition = cache_definition::load($id, $definition);
                     }
                 } else {
-                    $definition = cache_definition::load($id, $definition, $aggregate);
+                    $definition = cache_definition::load($id, $definition);
                 }
             }
             $this->definitions[$id] = $definition;

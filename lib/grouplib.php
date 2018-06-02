@@ -165,7 +165,8 @@ function groups_get_grouping_by_idnumber($courseid, $idnumber) {
  * @param int $groupid ID of the group.
  * @param string $fields (default is all fields)
  * @param int $strictness (IGNORE_MISSING - default)
- * @return stdGlass group object
+ * @return bool|stdClass group object or false if not found
+ * @throws dml_exception
  */
 function groups_get_group($groupid, $fields='*', $strictness=IGNORE_MISSING) {
     global $DB;
@@ -194,9 +195,11 @@ function groups_get_grouping($groupingid, $fields='*', $strictness=IGNORE_MISSIN
  * @param mixed $userid optional user id or array of ids, returns only groups of the user.
  * @param int $groupingid optional returns only groups in the specified grouping.
  * @param string $fields
+ * @param bool $withmembers If true - this will return an extra field which is the list of userids that
+ *                          are members of this group.
  * @return array Returns an array of the group objects (userid field returned if array in $userid)
  */
-function groups_get_all_groups($courseid, $userid=0, $groupingid=0, $fields='g.*') {
+function groups_get_all_groups($courseid, $userid=0, $groupingid=0, $fields='g.*', $withmembers=false) {
     global $DB;
 
     // We need to check that we each field in the fields list belongs to the group table and that it has not being
@@ -219,7 +222,7 @@ function groups_get_all_groups($courseid, $userid=0, $groupingid=0, $fields='g.*
         }
     }
 
-    if (empty($userid) && $knownfields) {
+    if (empty($userid) && $knownfields && !$withmembers) {
         // We can use the cache.
         $data = groups_get_course_data($courseid);
         if (empty($groupingid)) {
@@ -239,13 +242,13 @@ function groups_get_all_groups($courseid, $userid=0, $groupingid=0, $fields='g.*
         // Yay! We could use the cache. One more query saved.
         return $groups;
     }
-
+    $memberselect = '';
+    $memberjoin = '';
 
     if (empty($userid)) {
         $userfrom  = "";
         $userwhere = "";
         $params = array();
-
     } else {
         list($usql, $params) = $DB->get_in_or_equal($userid);
         $userfrom  = ", {groups_members} gm";
@@ -261,14 +264,182 @@ function groups_get_all_groups($courseid, $userid=0, $groupingid=0, $fields='g.*
         $groupingwhere = "";
     }
 
+    if ($withmembers) {
+        $memberselect = $DB->sql_concat("COALESCE(ugm.userid, 0)", "':'", 'g.id') . ' AS ugmid, ugm.userid, ';
+        $memberjoin = ' LEFT JOIN {groups_members} ugm ON ugm.groupid = g.id ';
+    }
+
     array_unshift($params, $courseid);
 
-    return $DB->get_records_sql("SELECT $fields
-                                   FROM {groups} g $userfrom $groupingfrom
+    $results = $DB->get_records_sql("SELECT $memberselect $fields
+                                   FROM {groups} g $userfrom $groupingfrom $memberjoin
                                   WHERE g.courseid = ? $userwhere $groupingwhere
                                ORDER BY name ASC", $params);
+
+    if ($withmembers) {
+        // We need to post-process the results back into standard format.
+        $groups = [];
+        foreach ($results as $row) {
+            if (!isset($groups[$row->id])) {
+                $row->members = [$row->userid => $row->userid];
+                unset($row->userid);
+                unset($row->ugmid);
+                $groups[$row->id] = $row;
+            } else {
+                $groups[$row->id]->members[$row->userid] = $row->userid;
+            }
+        }
+        $results = $groups;
+    }
+
+    return $results;
 }
 
+/**
+ * Gets array of all groups in a set of course.
+ *
+ * @category group
+ * @param array $courses Array of course objects or course ids.
+ * @return array Array of groups indexed by course id.
+ */
+function groups_get_all_groups_for_courses($courses) {
+    global $DB;
+
+    if (empty($courses)) {
+        return [];
+    }
+
+    $groups = [];
+    $courseids = [];
+
+    foreach ($courses as $course) {
+        $courseid = is_object($course) ? $course->id : $course;
+        $groups[$courseid] = [];
+        $courseids[] = $courseid;
+    }
+
+    $groupfields = [
+        'g.id as gid',
+        'g.courseid',
+        'g.idnumber',
+        'g.name',
+        'g.description',
+        'g.descriptionformat',
+        'g.enrolmentkey',
+        'g.picture',
+        'g.hidepicture',
+        'g.timecreated',
+        'g.timemodified'
+    ];
+
+    $groupsmembersfields = [
+        'gm.id as gmid',
+        'gm.groupid',
+        'gm.userid',
+        'gm.timeadded',
+        'gm.component',
+        'gm.itemid'
+    ];
+
+    $concatidsql = $DB->sql_concat_join("'-'", ['g.id', 'COALESCE(gm.id, 0)']) . ' AS uniqid';
+    list($courseidsql, $params) = $DB->get_in_or_equal($courseids);
+    $groupfieldssql = implode(',', $groupfields);
+    $groupmembersfieldssql = implode(',', $groupsmembersfields);
+    $sql = "SELECT {$concatidsql}, {$groupfieldssql}, {$groupmembersfieldssql}
+              FROM {groups} g
+         LEFT JOIN {groups_members} gm
+                ON gm.groupid = g.id
+             WHERE g.courseid {$courseidsql}";
+
+    $results = $DB->get_records_sql($sql, $params);
+
+    // The results will come back as a flat dataset thanks to the left
+    // join so we will need to do some post processing to blow it out
+    // into a more usable data structure.
+    //
+    // This loop will extract the distinct groups from the result set
+    // and add it's list of members to the object as a property called
+    // 'members'. Then each group will be added to the result set indexed
+    // by it's course id.
+    //
+    // The resulting data structure for $groups should be:
+    // $groups = [
+    //      '1' = [
+    //          '1' => (object) [
+    //              'id' => 1,
+    //              <rest of group properties>
+    //              'members' => [
+    //                  '1' => (object) [
+    //                      <group member properties>
+    //                  ],
+    //                  '2' => (object) [
+    //                      <group member properties>
+    //                  ]
+    //              ]
+    //          ],
+    //          '2' => (object) [
+    //              'id' => 2,
+    //              <rest of group properties>
+    //              'members' => [
+    //                  '1' => (object) [
+    //                      <group member properties>
+    //                  ],
+    //                  '3' => (object) [
+    //                      <group member properties>
+    //                  ]
+    //              ]
+    //          ]
+    //      ]
+    // ]
+    //
+    foreach ($results as $key => $result) {
+        $groupid = $result->gid;
+        $courseid = $result->courseid;
+        $coursegroups = $groups[$courseid];
+        $groupsmembersid = $result->gmid;
+        $reducefunc = function($carry, $field) use ($result) {
+            // Iterate over the groups properties and pull
+            // them out into a separate object.
+            list($prefix, $field) = explode('.', $field);
+
+            if (property_exists($result, $field)) {
+                $carry[$field] = $result->{$field};
+            }
+
+            return $carry;
+        };
+
+        if (isset($coursegroups[$groupid])) {
+            $group = $coursegroups[$groupid];
+        } else {
+            $initial = [
+                'id' => $groupid,
+                'members' => []
+            ];
+            $group = (object) array_reduce(
+                $groupfields,
+                $reducefunc,
+                $initial
+            );
+        }
+
+        if (!empty($groupsmembersid)) {
+            $initial = ['id' => $groupsmembersid];
+            $groupsmembers = (object) array_reduce(
+                $groupsmembersfields,
+                $reducefunc,
+                $initial
+            );
+
+            $group->members[$groupsmembers->userid] = $groupsmembers;
+        }
+
+        $coursegroups[$groupid] = $group;
+        $groups[$courseid] = $coursegroups;
+    }
+
+    return $groups;
+}
 
 /**
  * Gets array of all groups in current user.
@@ -302,38 +473,54 @@ function groups_get_user_groups($courseid, $userid=0) {
         $userid = $USER->id;
     }
 
-    $sql = "SELECT g.id, gg.groupingid
-              FROM {groups} g
-                   JOIN {groups_members} gm   ON gm.groupid = g.id
-              LEFT JOIN {groupings_groups} gg ON gg.groupid = g.id
-             WHERE gm.userid = ? AND g.courseid = ?";
-    $params = array($userid, $courseid);
+    $cache = cache::make('core', 'user_group_groupings');
 
-    $rs = $DB->get_recordset_sql($sql, $params);
+    // Try to retrieve group ids from the cache.
+    $usergroups = $cache->get($userid);
 
-    if (!$rs->valid()) {
-        $rs->close(); // Not going to iterate (but exit), close rs
+    if ($usergroups === false) {
+        $sql = "SELECT g.id, g.courseid, gg.groupingid
+                  FROM {groups} g
+                  JOIN {groups_members} gm ON gm.groupid = g.id
+             LEFT JOIN {groupings_groups} gg ON gg.groupid = g.id
+                 WHERE gm.userid = ?";
+
+        $rs = $DB->get_recordset_sql($sql, array($userid));
+
+        $usergroups = array();
+        $allgroups  = array();
+
+        foreach ($rs as $group) {
+            if (!array_key_exists($group->courseid, $allgroups)) {
+                $allgroups[$group->courseid] = array();
+            }
+            $allgroups[$group->courseid][$group->id] = $group->id;
+            if (!array_key_exists($group->courseid, $usergroups)) {
+                $usergroups[$group->courseid] = array();
+            }
+            if (is_null($group->groupingid)) {
+                continue;
+            }
+            if (!array_key_exists($group->groupingid, $usergroups[$group->courseid])) {
+                $usergroups[$group->courseid][$group->groupingid] = array();
+            }
+            $usergroups[$group->courseid][$group->groupingid][$group->id] = $group->id;
+        }
+        $rs->close();
+
+        foreach (array_keys($allgroups) as $cid) {
+            $usergroups[$cid]['0'] = array_keys($allgroups[$cid]); // All user groups in the course.
+        }
+
+        // Cache the data.
+        $cache->set($userid, $usergroups);
+    }
+
+    if (array_key_exists($courseid, $usergroups)) {
+        return $usergroups[$courseid];
+    } else {
         return array('0' => array());
     }
-
-    $result    = array();
-    $allgroups = array();
-
-    foreach ($rs as $group) {
-        $allgroups[$group->id] = $group->id;
-        if (is_null($group->groupingid)) {
-            continue;
-        }
-        if (!array_key_exists($group->groupingid, $result)) {
-            $result[$group->groupingid] = array();
-        }
-        $result[$group->groupingid][$group->id] = $group->id;
-    }
-    $rs->close();
-
-    $result['0'] = array_keys($allgroups); // all groups
-
-    return $result;
 }
 
 /**
@@ -513,8 +700,11 @@ function groups_print_course_menu($course, $urlroot, $return=false) {
     $context = context_course::instance($course->id);
     $aag = has_capability('moodle/site:accessallgroups', $context);
 
+    $usergroups = array();
     if ($groupmode == VISIBLEGROUPS or $aag) {
         $allowedgroups = groups_get_all_groups($course->id, 0, $course->defaultgroupingid);
+        // Get user's own groups and put to the top.
+        $usergroups = groups_get_all_groups($course->id, $USER->id, $course->defaultgroupingid);
     } else {
         $allowedgroups = groups_get_all_groups($course->id, $USER->id, $course->defaultgroupingid);
     }
@@ -526,11 +716,7 @@ function groups_print_course_menu($course, $urlroot, $return=false) {
         $groupsmenu[0] = get_string('allparticipants');
     }
 
-    if ($allowedgroups) {
-        foreach ($allowedgroups as $group) {
-            $groupsmenu[$group->id] = format_string($group->name);
-        }
-    }
+    $groupsmenu += groups_sort_menu_options($allowedgroups, $usergroups);
 
     if ($groupmode == VISIBLEGROUPS) {
         $grouplabel = get_string('groupsvisible');
@@ -563,6 +749,55 @@ function groups_print_course_menu($course, $urlroot, $return=false) {
 }
 
 /**
+ * Turn an array of groups into an array of menu options.
+ * @param array $groups of group objects.
+ * @return array groupid => formatted group name.
+ */
+function groups_list_to_menu($groups) {
+    $groupsmenu = array();
+    foreach ($groups as $group) {
+        $groupsmenu[$group->id] = format_string($group->name);
+    }
+    return $groupsmenu;
+}
+
+/**
+ * Takes user's allowed groups and own groups and formats for use in group selector menu
+ * If user has allowed groups + own groups will add to an optgroup
+ * Own groups are removed from allowed groups
+ * @param array $allowedgroups All groups user is allowed to see
+ * @param array $usergroups Groups user belongs to
+ * @return array
+ */
+function groups_sort_menu_options($allowedgroups, $usergroups) {
+    $useroptions = array();
+    if ($usergroups) {
+        $useroptions = groups_list_to_menu($usergroups);
+
+        // Remove user groups from other groups list.
+        foreach ($usergroups as $group) {
+            unset($allowedgroups[$group->id]);
+        }
+    }
+
+    $allowedoptions = array();
+    if ($allowedgroups) {
+        $allowedoptions = groups_list_to_menu($allowedgroups);
+    }
+
+    if ($useroptions && $allowedoptions) {
+        return array(
+            1 => array(get_string('mygroups', 'group') => $useroptions),
+            2 => array(get_string('othergroups', 'group') => $allowedoptions)
+        );
+    } else if ($useroptions) {
+        return $useroptions;
+    } else {
+        return $allowedoptions;
+    }
+}
+
+/**
  * Generates html to print menu selector for course level, listing all groups.
  * Note: This api does not do any group mode check use groups_print_course_menu() instead if you want proper checks.
  *
@@ -587,9 +822,7 @@ function groups_allgroups_course_menu($course, $urlroot, $update = false, $activ
         $allowedgroups = groups_get_all_groups($course->id, $USER->id, $course->defaultgroupingid);
     }
 
-    foreach ($allowedgroups as $group) {
-        $groupsmenu[$group->id] = format_string($group->name);
-    }
+    $groupsmenu += groups_list_to_menu($allowedgroups);
 
     if ($update) {
         // Init activegroup array if necessary.
@@ -665,8 +898,11 @@ function groups_print_activity_menu($cm, $urlroot, $return=false, $hideallpartic
     $context = context_module::instance($cm->id);
     $aag = has_capability('moodle/site:accessallgroups', $context);
 
+    $usergroups = array();
     if ($groupmode == VISIBLEGROUPS or $aag) {
         $allowedgroups = groups_get_all_groups($cm->course, 0, $cm->groupingid); // any group in grouping
+        // Get user's own groups and put to the top.
+        $usergroups = groups_get_all_groups($cm->course, $USER->id, $cm->groupingid);
     } else {
         $allowedgroups = groups_get_all_groups($cm->course, $USER->id, $cm->groupingid); // only assigned groups
     }
@@ -678,11 +914,7 @@ function groups_print_activity_menu($cm, $urlroot, $return=false, $hideallpartic
         $groupsmenu[0] = get_string('allparticipants');
     }
 
-    if ($allowedgroups) {
-        foreach ($allowedgroups as $group) {
-            $groupsmenu[$group->id] = format_string($group->name);
-        }
-    }
+    $groupsmenu += groups_sort_menu_options($allowedgroups, $usergroups);
 
     if ($groupmode == VISIBLEGROUPS) {
         $grouplabel = get_string('groupsvisible');
@@ -849,105 +1081,6 @@ function groups_get_activity_allowed_groups($cm,$userid=0) {
 }
 
 /**
- * Filter a user list and return only the users that can see the course module based on
- * groups/permissions etc. It is assumed that the users are pre-filtered to those who are enrolled in the course.
- *
- * @category group
- * @param stdClass $cm The course module
- * @param array $users An array of users, indexed by userid
- * @return array A filtered list of users that can see the module, indexed by userid.
- */
-function groups_filter_users_by_course_module_visible($cm, $users) {
-    global $CFG, $DB;
-
-    if (empty($CFG->enablegroupmembersonly)) {
-        return $users;
-    }
-    if (empty($cm->groupmembersonly)) {
-        return $users;
-    }
-    list($usql, $uparams) = $DB->get_in_or_equal(array_keys($users), SQL_PARAMS_NAMED, 'userid', true);
-
-    // Group membership sub-query.
-    if ($cm->groupingid) {
-        // Find out if member of any group in selected activity grouping.
-        $igsql = "SELECT gm.userid
-                  FROM {groups_members} gm
-                  LEFT JOIN {groupings_groups} gg
-                  ON gm.groupid = gg.groupid
-                  WHERE gm.userid $usql AND gg.groupingid = :groupingid";
-        $igparams = array_merge($uparams, array('groupingid' => $cm->groupingid));
-
-    } else {
-        // No grouping used - check all groups in course.
-        $igsql = "SELECT gm.userid
-                  FROM {groups_members} gm
-                  LEFT JOIN {groups} g
-                  ON gm.groupid = g.id
-                  WHERE gm.userid $usql AND g.courseid = :courseid";
-        $igparams = array_merge($uparams, array('courseid' => $cm->course));
-    }
-
-    $context = context_module::instance($cm->id);
-
-    // Get the list of users in a valid group.
-    $usersingroup = $DB->get_records_sql($igsql, $igparams);
-    if (!$usersingroup) {
-        $usersingroup = array();
-    } else {
-        $usersingroup = array_keys($usersingroup);
-    }
-
-    // Get the list of users who can access all groups.
-    list($accessallgroupssql, $accessallgroupsparams) = get_enrolled_sql($context, 'moodle/site:accessallgroups');
-
-    $userswithaccessallgroups = $DB->get_records_sql($accessallgroupssql, $accessallgroupsparams);
-    if (!$userswithaccessallgroups) {
-        $userswithaccessallgroups = array();
-    } else {
-        $userswithaccessallgroups = array_keys($userswithaccessallgroups);
-    }
-
-    // Explaining this array mangling:
-    // $users is an array of $user[$userid] => stdClass etc
-    // $userswithaccessallgroups is an array of $userswithaccessallgroups[random int] = $userid
-    // $usersingroup is an array of $usersingroup[random int] = $userid
-    // so - the inner array_merge combines the values of the 2 arrays disregarding the keys (because they are ints)
-    // this is then flipped so the values become the keys (and the values are now nonsense)
-    // this is then intersected with the users array only by looking at the keys - this
-    // returns only the users from the original array that had a value in one of the two $usersxxx lists.
-    return array_intersect_key($users, array_flip(array_merge($userswithaccessallgroups, $usersingroup)));
-}
-
-/**
- * Determine if a course module is currently visible to a user
- *
- * $USER If $userid is null, use the global object.
- *
- * @category group
- * @param stdClass|cm_info $cm The course module
- * @param int $userid The user to check against the group.
- * @return bool True if the user can view the course module, false otherwise.
- */
-function groups_course_module_visible($cm, $userid=null) {
-    global $CFG, $USER;
-
-    if (empty($userid)) {
-        $userid = $USER->id;
-    }
-    if (empty($CFG->enablegroupmembersonly)) {
-        return true;
-    }
-    if (empty($cm->groupmembersonly)) {
-        return true;
-    }
-    if (has_capability('moodle/site:accessallgroups', context_module::instance($cm->id), $userid) or groups_has_membership($cm, $userid)) {
-        return true;
-    }
-    return false;
-}
-
-/**
  * Determine if a given group is visible to user or not in a given context.
  *
  * @since Moodle 2.6
@@ -983,6 +1116,42 @@ function groups_group_visible($groupid, $course, $cm = null, $userid = null) {
         }
     }
     return false;
+}
+
+/**
+ * Get sql and parameters that will return user ids for a group
+ *
+ * @param int $groupid
+ * @return array($sql, $params)
+ */
+function groups_get_members_ids_sql($groupid) {
+    $groupjoin = groups_get_members_join($groupid, 'u.id');
+
+    $sql = "SELECT DISTINCT u.id
+              FROM {user} u
+            $groupjoin->joins
+             WHERE u.deleted = 0";
+
+    return array($sql, $groupjoin->params);
+}
+
+/**
+ * Get sql join to return users in a group
+ *
+ * @param int $groupid
+ * @param string $useridcolumn The column of the user id from the calling SQL, e.g. u.id
+ * @return \core\dml\sql_join Contains joins, wheres, params
+ */
+function groups_get_members_join($groupid, $useridcolumn) {
+    // Use unique prefix just in case somebody makes some SQL magic with the result.
+    static $i = 0;
+    $i++;
+    $prefix = 'gm' . $i . '_';
+
+    $join = "JOIN {groups_members} {$prefix}gm ON ({$prefix}gm.userid = $useridcolumn AND {$prefix}gm.groupid = :{$prefix}gmid)";
+    $param = array("{$prefix}gmid" => $groupid);
+
+    return new \core\dml\sql_join($join, '', $param);
 }
 
 /**
@@ -1109,4 +1278,92 @@ function groups_get_course_data($courseid, cache $cache = null) {
         $data = groups_cache_groupdata($courseid, $cache);
     }
     return $data;
+}
+
+/**
+ * Determine if the current user can see at least one of the groups of the specified user.
+ *
+ * @param stdClass $course  Course object.
+ * @param int $userid  user id to check against.
+ * @param stdClass $cm Course module object. Optional, just for checking at activity level instead course one.
+ * @return boolean true if visible, false otherwise
+ * @since Moodle 2.9
+ */
+function groups_user_groups_visible($course, $userid, $cm = null) {
+    global $USER;
+
+    $groupmode = empty($cm) ? groups_get_course_groupmode($course) : groups_get_activity_groupmode($cm, $course);
+    if ($groupmode == NOGROUPS || $groupmode == VISIBLEGROUPS) {
+        // Groups are not used, or everything is visible, no need to go any further.
+        return true;
+    }
+
+    $context = empty($cm) ? context_course::instance($course->id) : context_module::instance($cm->id);
+    if (has_capability('moodle/site:accessallgroups', $context)) {
+        // User can see everything.
+        return true;
+    } else {
+        // Group mode is separate, and user doesn't have access all groups capability.
+        if (empty($cm)) {
+            $usergroups = groups_get_all_groups($course->id, $userid);
+            $currentusergroups = groups_get_all_groups($course->id, $USER->id);
+        } else {
+            $usergroups = groups_get_activity_allowed_groups($cm, $userid);
+            $currentusergroups = groups_get_activity_allowed_groups($cm, $USER->id);
+        }
+
+        $samegroups = array_intersect_key($currentusergroups, $usergroups);
+        if (!empty($samegroups)) {
+            // We share groups!
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Returns the users in the specified groups.
+ *
+ * This function does not return complete user objects by default. It returns the user_picture basic fields.
+ *
+ * @param array $groupsids The list of groups ids to check
+ * @param array $extrafields extra fields to be included in result
+ * @param int $sort optional sorting of returned users
+ * @return array|bool Returns an array of the users for the specified group or false if no users or an error returned.
+ * @since  Moodle 3.3
+ */
+function groups_get_groups_members($groupsids, $extrafields=null, $sort='lastname ASC') {
+    global $DB;
+
+    $userfields = user_picture::fields('u', $extrafields);
+    list($insql, $params) = $DB->get_in_or_equal($groupsids);
+
+    return $DB->get_records_sql("SELECT $userfields
+                                   FROM {user} u, {groups_members} gm
+                                  WHERE u.id = gm.userid AND gm.groupid $insql
+                               GROUP BY $userfields
+                               ORDER BY $sort", $params);
+}
+
+/**
+ * Returns users who share group membership with the specified user in the given actiivty.
+ *
+ * @param stdClass|cm_info $cm course module
+ * @param int $userid user id (empty for current user)
+ * @return array a list of user
+ * @since  Moodle 3.3
+ */
+function groups_get_activity_shared_group_members($cm, $userid = null) {
+    global $USER;
+
+    if (empty($userid)) {
+        $userid = $USER;
+    }
+
+    $groupsids = array_keys(groups_get_activity_allowed_groups($cm, $userid));
+    // No groups no users.
+    if (empty($groupsids)) {
+        return [];
+    }
+    return groups_get_groups_members($groupsids);
 }

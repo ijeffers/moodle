@@ -24,7 +24,7 @@
  * @author     Yuliya Bozhko <yuliya.bozhko@totaralms.com>
  */
 
-require_once(dirname(dirname(__FILE__)) . '/config.php');
+require_once(__DIR__ . '/../config.php');
 require_once($CFG->libdir . '/badgeslib.php');
 
 $type       = required_param('type', PARAM_INT);
@@ -85,7 +85,7 @@ if ($type == BADGE_TYPE_SITE) {
     $coursecontext = context_course::instance($course->id);
     $title = get_string('coursebadges', 'badges');
     $PAGE->set_context($coursecontext);
-    $PAGE->set_pagelayout('course');
+    $PAGE->set_pagelayout('incourse');
     $PAGE->set_heading(format_string($course->fullname, true, array('context' => $coursecontext)) . ': ' . $hdr);
     navigation_node::override_active_url(
         new moodle_url('/badges/index.php', array('type' => BADGE_TYPE_COURSE, 'id' => $course->id))
@@ -160,7 +160,7 @@ if ($type == BADGE_TYPE_SITE) {
 }
 echo $OUTPUT->box('', 'notifyproblem hide', 'check_connection');
 
-$totalcount = count(badges_get_badges($type, $courseid, '', '' , '', ''));
+$totalcount = count(badges_get_badges($type, $courseid, '', '' , 0, 0));
 $records = badges_get_badges($type, $courseid, $sortby, $sorthow, $page, BADGE_PERPAGE);
 
 if ($totalcount) {

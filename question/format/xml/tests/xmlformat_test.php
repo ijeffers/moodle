@@ -111,8 +111,43 @@ class qformat_xml_test extends question_testcase {
         return $newvar;
     }
 
+    public function test_xml_escape_simple_input_not_escaped() {
+        $exporter = new qformat_xml();
+        $string = 'Nothing funny here. Even if we go to a café or to 日本.';
+        $this->assertEquals($string, $exporter->xml_escape($string));
+    }
+
+    public function test_xml_escape_html_wrapped_in_cdata() {
+        $exporter = new qformat_xml();
+        $string = '<p>Nothing <b>funny<b> here. Even if we go to a café or to 日本.</p>';
+        $this->assertEquals('<![CDATA[' . $string . ']]>', $exporter->xml_escape($string));
+    }
+
+    public function test_xml_escape_script_tag_handled_ok() {
+        $exporter = new qformat_xml();
+        $input = '<script><![CDATA[alert(1<2);]]></script>';
+        $expected = '<![CDATA[<script><![CDATA[alert(1<2);]]]]><![CDATA[></script>]]>';
+        $this->assertEquals($expected, $exporter->xml_escape($input));
+
+        // Check that parsing the expected result does give the input again.
+        $parsed = simplexml_load_string('<div>' . $expected . '</div>');
+        $this->assertEquals($input, $parsed->xpath('//div')[0]);
+    }
+
+    public function test_xml_escape_code_that_looks_like_cdata_end_ok() {
+        $exporter = new qformat_xml();
+        $input = "if (x[[0]]>a) print('hah');";
+        $expected = "<![CDATA[if (x[[0]]]]><![CDATA[>a) print('hah');]]>";
+        $this->assertEquals($expected, $exporter->xml_escape($input));
+
+        // Check that parsing the expected result does give the input again.
+        $parsed = simplexml_load_string('<div>' . $expected . '</div>');
+        $this->assertEquals($input, $parsed->xpath('//div')[0]);
+    }
+
     public function test_write_hint_basic() {
         $q = $this->make_test_question();
+        $q->contextid = \context_system::instance()->id;
         $q->name = 'Short answer question';
         $q->questiontext = 'Name an amphibian: __________';
         $q->generalfeedback = 'Generalfeedback: frog or toad would have been OK.';
@@ -142,6 +177,7 @@ class qformat_xml_test extends question_testcase {
 
     public function test_write_hint_with_parts() {
         $q = $this->make_test_question();
+        $q->contextid = \context_system::instance()->id;
         $q->name = 'Matching question';
         $q->questiontext = 'Classify the animals.';
         $q->generalfeedback = 'Frogs and toads are amphibians, the others are mammals.';
@@ -268,6 +304,10 @@ END;
     <defaultgrade>0</defaultgrade>
     <penalty>0</penalty>
     <hidden>0</hidden>
+    <tags>
+      <tag><text>tagDescription</text></tag>
+      <tag><text>tagTest</text></tag>
+    </tags>
   </question>';
         $xmldata = xmlize($xml);
 
@@ -283,6 +323,7 @@ END;
         $expectedq->defaultmark = 0;
         $expectedq->length = 0;
         $expectedq->penalty = 0;
+        $expectedq->tags = array('tagDescription', 'tagTest');
 
         $this->assert(new question_check_specified_fields_expectation($expectedq), $q);
     }
@@ -290,7 +331,7 @@ END;
     public function test_export_description() {
         $qdata = new stdClass();
         $qdata->id = 123;
-        $qdata->contextid = 0;
+        $qdata->contextid = \context_system::instance()->id;
         $qdata->qtype = 'description';
         $qdata->name = 'A description';
         $qdata->questiontext = 'The question text.';
@@ -339,6 +380,11 @@ END;
     <defaultgrade>1</defaultgrade>
     <penalty>0</penalty>
     <hidden>0</hidden>
+    <tags>
+      <tag><text>tagEssay</text></tag>
+      <tag><text>tagEssay20</text></tag>
+      <tag><text>tagTest</text></tag>
+    </tags>
   </question>';
         $xmldata = xmlize($xml);
 
@@ -363,6 +409,7 @@ END;
         $expectedq->graderinfo['format'] = FORMAT_MOODLE;
         $expectedq->responsetemplate['text'] = '';
         $expectedq->responsetemplate['format'] = FORMAT_MOODLE;
+        $expectedq->tags = array('tagEssay', 'tagEssay20', 'tagTest');
 
         $this->assert(new question_check_specified_fields_expectation($expectedq), $q);
     }
@@ -392,6 +439,11 @@ END;
     <responsetemplate format="html">
         <text><![CDATA[<p>Here is something <b>really</b> interesting.</p>]]></text>
     </responsetemplate>
+    <tags>
+      <tag><text>tagEssay</text></tag>
+      <tag><text>tagEssay21</text></tag>
+      <tag><text>tagTest</text></tag>
+    </tags>
   </question>';
         $xmldata = xmlize($xml);
 
@@ -416,6 +468,7 @@ END;
         $expectedq->graderinfo['format'] = FORMAT_HTML;
         $expectedq->responsetemplate['text'] = '<p>Here is something <b>really</b> interesting.</p>';
         $expectedq->responsetemplate['format'] = FORMAT_HTML;
+        $expectedq->tags = array('tagEssay', 'tagEssay21', 'tagTest');
 
         $this->assert(new question_check_specified_fields_expectation($expectedq), $q);
     }
@@ -423,7 +476,7 @@ END;
     public function test_export_essay() {
         $qdata = new stdClass();
         $qdata->id = 123;
-        $qdata->contextid = 0;
+        $qdata->contextid = \context_system::instance()->id;
         $qdata->qtype = 'essay';
         $qdata->name = 'An essay';
         $qdata->questiontext = 'Write something.';
@@ -537,6 +590,10 @@ END;
       <shownumcorrect />
       <clearwrong />
     </hint>
+    <tags>
+      <tag><text>tagMatching</text></tag>
+      <tag><text>tagTest</text></tag>
+    </tags>
   </question>';
         $xmldata = xmlize($xml);
 
@@ -573,6 +630,7 @@ END;
         );
         $expectedq->hintshownumcorrect = array(true, true);
         $expectedq->hintclearwrong = array(false, true);
+        $expectedq->tags = array('tagMatching', 'tagTest');
 
         $this->assert(new question_check_specified_fields_expectation($expectedq), $q);
     }
@@ -580,7 +638,7 @@ END;
     public function test_export_match() {
         $qdata = new stdClass();
         $qdata->id = 123;
-        $qdata->contextid = 0;
+        $qdata->contextid = \context_system::instance()->id;
         $qdata->qtype = 'match';
         $qdata->name = 'Matching question';
         $qdata->questiontext = 'Match the upper and lower case letters.';
@@ -811,7 +869,7 @@ END;
     public function test_export_multichoice() {
         $qdata = new stdClass();
         $qdata->id = 123;
-        $qdata->contextid = 0;
+        $qdata->contextid = \context_system::instance()->id;
         $qdata->qtype = 'multichoice';
         $qdata->name = 'Multiple choice question';
         $qdata->questiontext = 'Which are the even numbers?';
@@ -984,7 +1042,7 @@ END;
 
         $qdata = new stdClass();
         $qdata->id = 123;
-        $qdata->contextid = 0;
+        $qdata->contextid = \context_system::instance()->id;
         $qdata->qtype = 'numerical';
         $qdata->name = 'Numerical question';
         $qdata->questiontext = 'What is the answer?';
@@ -1114,7 +1172,7 @@ END;
     public function test_export_shortanswer() {
         $qdata = new stdClass();
         $qdata->id = 123;
-        $qdata->contextid = 0;
+        $qdata->contextid = \context_system::instance()->id;
         $qdata->qtype = 'shortanswer';
         $qdata->name = 'Short answer question';
         $qdata->questiontext = 'Fill in the gap in this sequence: Alpha, ________, Gamma.';
@@ -1235,7 +1293,7 @@ END;
     public function test_export_truefalse() {
         $qdata = new stdClass();
         $qdata->id = 12;
-        $qdata->contextid = 0;
+        $qdata->contextid = \context_system::instance()->id;
         $qdata->qtype = 'truefalse';
         $qdata->name = 'True false question';
         $qdata->questiontext = 'The answer is true.';
@@ -1309,6 +1367,10 @@ END;
     <hint format="html">
       <text>Hint 2</text>
     </hint>
+    <tags>
+      <tag><text>tagCloze</text></tag>
+      <tag><text>tagTest</text></tag>
+    </tags>
   </question>
 ';
         $xmldata = xmlize($xml);
@@ -1362,7 +1424,7 @@ END;
 
         $mc->layout = 0;
         $mc->single = 1;
-        $mc->shuffleanswers = 1;
+        $mc->shuffleanswers = 0;
         $mc->correctfeedback =          array('text' => '', 'format' => FORMAT_HTML, 'itemid' => null);
         $mc->partiallycorrectfeedback = array('text' => '', 'format' => FORMAT_HTML, 'itemid' => null);
         $mc->incorrectfeedback =        array('text' => '', 'format' => FORMAT_HTML, 'itemid' => null);
@@ -1385,6 +1447,7 @@ END;
             1 => $sa,
             2 => $mc,
         );
+        $expectedqa->tags = array('tagCloze', 'tagTest');
 
         $this->assertEquals($expectedqa->hint, $q->hint);
         $this->assertEquals($expectedqa->options->questions[1], $q->options->questions[1]);
@@ -1394,7 +1457,7 @@ END;
 
     public function test_export_multianswer() {
         $qdata = test_question_maker::get_question_data('multianswer', 'twosubq');
-
+        $qdata->contextid = \context_system::instance()->id;
         $exporter = new qformat_xml();
         $xml = $exporter->writequestion($qdata);
 
@@ -1425,7 +1488,7 @@ END;
 
     public function test_export_multianswer_withdollars() {
         $qdata = test_question_maker::get_question_data('multianswer', 'dollarsigns');
-
+        $qdata->contextid = \context_system::instance()->id;
         $exporter = new qformat_xml();
         $xml = $exporter->writequestion($qdata);
 

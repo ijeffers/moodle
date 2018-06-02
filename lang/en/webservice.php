@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -18,7 +17,7 @@
 /**
  * Strings for component 'webservice', language 'en', branch 'MOODLE_20_STABLE'
  *
- * @package   webservice
+ * @package   core_webservice
  * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -36,11 +35,11 @@ $string['addrequiredcapability'] = 'Assign/unassign the required capability';
 $string['addservice'] = 'Add a new service: {$a->name} (id: {$a->id})';
 $string['addservicefunction'] = 'Add functions to the service "{$a}"';
 $string['allusers'] = 'All users';
-$string['amftestclient'] = 'AMF test client';
 $string['apiexplorer'] = 'API explorer';
 $string['apiexplorernotavalaible'] = 'API explorer not available yet.';
 $string['arguments'] = 'Arguments';
 $string['authmethod'] = 'Authentication method';
+$string['callablefromajax'] = 'Callable from AJAX';
 $string['cannotcreatetoken'] = 'No permission to create web service token for the service {$a}.';
 $string['cannotgetcoursecontents'] = 'Cannot get course contents';
 $string['configwebserviceplugins'] = 'For security reasons, only protocols that are in use should be enabled.';
@@ -69,7 +68,6 @@ $string['editservice'] = 'Edit the service: {$a->name} (id: {$a->id})';
 $string['enabled'] = 'Enabled';
 $string['enabledocumentation'] = 'Enable developer documentation';
 $string['enabledocumentationdescription'] = 'Detailed web services documentation is available for enabled protocols.';
-$string['enablemobilewsoverview'] = 'Go to {$a->manageservicelink} administration page, check the "{$a->enablemobileservice}" setting and Save. Everything will be setup for you and all site\'s users will be able to use the offical Moodle app. Current status: {$a->wsmobilestatus}';
 $string['enableprotocols'] = 'Enable protocols';
 $string['enableprotocolsdescription'] = 'At least one protocol should be enabled. For security reasons, only protocols that are to be used should be enabled.';
 $string['enablews'] = 'Enable web services';
@@ -114,9 +112,10 @@ $string['invalidiptoken'] = 'Invalid token - your IP is not supported';
 $string['invalidtimedtoken'] = 'Invalid token - token expired';
 $string['invalidtoken'] = 'Invalid token - token not found';
 $string['iprestriction'] = 'IP restriction';
-$string['iprestriction_help'] = 'The user will need to call web service from the listed IPs.';
+$string['iprestriction_help'] = 'The user will need to call the web service from the listed IPs (separated by commas).';
 $string['key'] = 'Key';
 $string['keyshelp'] = 'The keys are used to access your Moodle account from external applications.';
+$string['loginrequired'] = 'Restricted to logged-in users';
 $string['manageprotocols'] = 'Manage protocols';
 $string['managetokens'] = 'Manage tokens';
 $string['missingcaps'] = 'Missing capabilities';
@@ -125,14 +124,14 @@ $string['missingpassword'] = 'Missing password';
 $string['missingrequiredcapability'] = 'The capability {$a} is required.';
 $string['missingusername'] = 'Missing username';
 $string['missingversionfile'] = 'Coding error: version.php file is missing for the component {$a}';
-$string['mobilewsdisabled'] = 'Disabled';
-$string['mobilewsenabled'] = 'Enabled';
+$string['nameexists'] = 'This name is already in use by another service';
 $string['nocapabilitytouseparameter'] = 'The user does not have the required capability to use the parameter {$a}';
 $string['nofunctions'] = 'This service has no functions.';
 $string['norequiredcapability'] = 'No required capability';
 $string['notoken'] = 'The token list is empty.';
 $string['onesystemcontrolling'] = 'Allow an external system to control Moodle';
 $string['onesystemcontrollingdescription'] = 'The following steps help you to set up the Moodle web services to allow an external system to interact with Moodle. This includes setting up a token (security key) authentication method.';
+$string['onlyseecreatedtokens'] = 'Any token can be deleted, though you can only view tokens that you created.';
 $string['operation'] = 'Operation';
 $string['optional'] = 'Optional';
 $string['passwordisexpired'] = 'Password is expired.';
@@ -142,6 +141,22 @@ $string['postrestparam'] = 'PHP code for REST (POST request)';
 $string['potusers'] = 'Not authorised users';
 $string['potusersmatching'] = 'Not authorised users matching';
 $string['print'] = 'Print all';
+$string['privacy:metadata:serviceusers'] = 'A list of users who can use a certain external services';
+$string['privacy:metadata:serviceusers:iprestriction'] = 'IP restricted to use the service';
+$string['privacy:metadata:serviceusers:timecreated'] = 'The date at which the record was created';
+$string['privacy:metadata:serviceusers:userid'] = 'The ID of the user';
+$string['privacy:metadata:serviceusers:validuntil'] = 'The date at which the authorisation ends';
+$string['privacy:metadata:tokens'] = 'A record of tokens for interacting with Moodle through web services or Mobile applications.';
+$string['privacy:metadata:tokens:creatorid'] = 'The ID of the user who created the token';
+$string['privacy:metadata:tokens:iprestriction'] = 'IP restricted to use this token';
+$string['privacy:metadata:tokens:lastaccess'] = 'The date at which the token was last used';
+$string['privacy:metadata:tokens:privatetoken'] = 'A more private token occasionally used to validate certain operations, such as SSO.';
+$string['privacy:metadata:tokens:timecreated'] = 'The date at which the token was created';
+$string['privacy:metadata:tokens:token'] = 'The user\'s token';
+$string['privacy:metadata:tokens:tokentype'] = 'The type of token';
+$string['privacy:metadata:tokens:userid'] = 'The ID of the user whose token it is';
+$string['privacy:metadata:tokens:validuntil'] = 'The date at which the token becomes invalid';
+$string['privacy:request:notexportedsecurity'] = 'Not exported for security reasons';
 $string['protocol'] = 'Protocol';
 $string['removefunction'] = 'Remove';
 $string['removefunctionconfirm'] = 'Do you really want to remove function "{$a->function}" from service "{$a->service}"?';
@@ -181,9 +196,9 @@ $string['shortnametaken'] = 'Short name is already used for another service ({$a
 $string['simpleauthlog'] = 'Simple authentication login';
 $string['step'] = 'Step';
 $string['supplyinfo'] = 'More details';
-$string['testauserwithtestclientdescription'] = 'Simulate external access to the service using the web service test client. Before doing so, login as a user with the moodle/webservice:createtoken capability and obtain the security key (token) via My profile settings. You will use this token in the test client. In the test client, also choose an enabled protocol with the token authentication. <strong>WARNING: The functions that you test WILL BE EXECUTED for this user, so be careful what you choose to test!</strong>';
+$string['testauserwithtestclientdescription'] = 'Simulate external access to the service using the web service test client. Before doing so, log in as a user with the moodle/webservice:createtoken capability and obtain the security key (token) via the user\'s preferences page. You will use this token in the test client. In the test client, also choose an enabled protocol with the token authentication. <strong>WARNING: The functions that you test WILL BE EXECUTED for this user, so be careful what you choose to test!</strong>';
 $string['testclient'] = 'Web service test client';
-$string['testclientdescription'] = '* The web service test client <strong>executes</strong> the functions for <strong>REAL</strong>. Do not test functions that you don\'t know. <br/>* All existing web service functions are not yet implemented into the test client. <br/>* In order to check that a user cannot access some functions, you can test some functions that you didn\'t allow.<br/>* To see clearer error messages set the debugging to <strong>{$a->mode}</strong> into {$a->atag}<br/>* Access the {$a->amfatag}.';
+$string['testclientdescription'] = '* The web service test client <strong>executes</strong> the functions for <strong>REAL</strong>. Do not test functions that you don\'t know. <br/>* All existing web service functions are not yet implemented into the test client. <br/>* In order to check that a user cannot access some functions, you can test some functions that you didn\'t allow.<br/>* To see clearer error messages set the debugging to <strong>{$a->mode}</strong> into {$a->atag}.';
 $string['testwithtestclient'] = 'Test the service';
 $string['testwithtestclientdescription'] = 'Simulate external access to the service using the web service test client. Use an enabled protocol with token authentication. <strong>WARNING: The functions that you test WILL BE EXECUTED, so be careful what you choose to test!</strong>';
 $string['token'] = 'Token';
@@ -196,13 +211,14 @@ $string['updateusersettings'] = 'Update';
 $string['uploadfiles'] = 'Can upload files';
 $string['uploadfiles_help'] = 'If enabled, any user can upload files with their security keys to their own private files area or a draft file area. Any user file quotas apply.';
 $string['userasclients'] = 'Users as clients with token';
-$string['userasclientsdescription'] = 'The following steps help you to set up the Moodle web service for users as clients. These steps also help to set up the recommended token (security keys) authentication method. In this use case, the user will generate his token from the security keys page via My profile settings.';
+$string['userasclientsdescription'] = 'The following steps help you to set up the Moodle web service for users as clients. These steps also help to set up the recommended token (security keys) authentication method. In this use case, the user will generate their token from the security keys page via their preferences page.';
 $string['usermissingcaps'] = 'Missing capabilities: {$a}';
 $string['usernameorid'] = 'Username / User id';
 $string['usernameorid_help'] = 'Enter a username or a user id.';
 $string['usernameoridnousererror'] = 'No users were found with this username/user id.';
 $string['usernameoridoccurenceerror'] = 'More than one user was found with this username. Please enter the user id.';
 $string['usernotallowed'] = 'The user is not allowed for this service. First you need to allow this user on the {$a}\'s allowed users administration page.';
+$string['userservices'] = 'User services: {$a}';
 $string['usersettingssaved'] = 'User settings saved';
 $string['validuntil'] = 'Valid until';
 $string['validuntil_help'] = 'If set, the service will be inactivated after this date for this user.';

@@ -33,6 +33,20 @@ defined('MOODLE_INTERNAL') || die();
 class tool extends base {
 
     public function is_uninstall_allowed() {
+        // Some mobile settings are used by the core.
+        if ($this->name === 'mobile') {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * Tools cannot be disabled.
+     *
+     * @return boolean
+     */
+    public function is_enabled() {
         return true;
     }
 

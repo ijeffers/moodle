@@ -14,112 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * This is really a little language parser for AICC_SCRIPT
- * evaluates the expression and returns a boolean answer
- * see 2.3.2.5.1. Sequencing/Navigation Today  - from the SCORM 1.2 spec (CAM).
- *
- * @param string $prerequisites the aicc_script prerequisites expression
- * @param array  $usertracks the tracked user data of each SCO visited
- * @return boolean
- */
-function scorm_eval_prerequisites($prerequisites, $usertracks) {
-
-    // this is really a little language parser - AICC_SCRIPT is the reference
-    // see 2.3.2.5.1. Sequencing/Navigation Today  - from the SCORM 1.2 spec
-    $element = '';
-    $stack = array();
-    $statuses = array(
-                'passed' => 'passed',
-                'completed' => 'completed',
-                'failed' => 'failed',
-                'incomplete' => 'incomplete',
-                'browsed' => 'browsed',
-                'not attempted' => 'notattempted',
-                'p' => 'passed',
-                'c' => 'completed',
-                'f' => 'failed',
-                'i' => 'incomplete',
-                'b' => 'browsed',
-                'n' => 'notattempted'
-                );
-    $i=0;
-
-    // expand the amp entities
-    $prerequisites = preg_replace('/&amp;/', '&', $prerequisites);
-    // find all my parsable tokens
-    $prerequisites = preg_replace('/(&|\||\(|\)|\~)/', '\t$1\t', $prerequisites);
-    // expand operators
-    $prerequisites = preg_replace('/&/', '&&', $prerequisites);
-    $prerequisites = preg_replace('/\|/', '||', $prerequisites);
-    // now - grab all the tokens
-    $elements = explode('\t', trim($prerequisites));
-
-    // process each token to build an expression to be evaluated
-    $stack = array();
-    foreach ($elements as $element) {
-        $element = trim($element);
-        if (empty($element)) {
-            continue;
-        }
-        if (!preg_match('/^(&&|\|\||\(|\))$/', $element)) {
-            // create each individual expression
-            // search for ~ = <> X*{}
-
-            // sets like 3*{S34, S36, S37, S39}
-            if (preg_match('/^(\d+)\*\{(.+)\}$/', $element, $matches)) {
-                $repeat = $matches[1];
-                $set = explode(',', $matches[2]);
-                $count = 0;
-                foreach ($set as $setelement) {
-                    if (isset($usertracks[$setelement]) &&
-                       ($usertracks[$setelement]->status == 'completed' || $usertracks[$setelement]->status == 'passed')) {
-                        $count++;
-                    }
-                }
-                if ($count >= $repeat) {
-                    $element = 'true';
-                } else {
-                    $element = 'false';
-                }
-
-            // ~ Not
-            } else if ($element == '~') {
-                $element = '!';
-
-            // = | <>
-            } else if (preg_match('/^(.+)(\=|\<\>)(.+)$/', $element, $matches)) {
-                $element = trim($matches[1]);
-                if (isset($usertracks[$element])) {
-                    $value = trim(preg_replace('/(\'|\")/', '', $matches[3]));
-                    if (isset($statuses[$value])) {
-                        $value = $statuses[$value];
-                    }
-                    if ($matches[2] == '<>') {
-                        $oper = '!=';
-                    } else {
-                      $oper = '==';
-                    }
-                    $element = '(\''.$usertracks[$element]->status.'\' '.$oper.' \''.$value.'\')';
-                } else {
-                  $element = 'false';
-                }
-
-            // everything else must be an element defined like S45 ...
-            } else {
-                if (isset($usertracks[$element]) &&
-                    ($usertracks[$element]->status == 'completed' || $usertracks[$element]->status == 'passed')) {
-                    $element = 'true';
-                } else {
-                    $element = 'false';
-                }
-            }
-
-        }
-        $stack []= ' '.$element.' ';
-    }
-    return eval('return '.implode($stack).';');
-}
 
 /**
  * Sets up $userdata array and default values for SCORM 1.2 .
@@ -135,7 +29,11 @@ function get_scorm_default (&$userdata, $scorm, $scoid, $attempt, $mode) {
     global $USER;
 
     $userdata->student_id = $USER->username;
-    $userdata->student_name = $USER->lastname .', '. $USER->firstname;
+    if (empty(get_config('scorm', 'scormstandard'))) {
+        $userdata->student_name = fullname($USER);
+    } else {
+        $userdata->student_name = $USER->lastname .', '. $USER->firstname;
+    }
 
     if ($usertrack = scorm_get_tracks($scoid, $USER->id, $attempt)) {
         foreach ($usertrack as $key => $value) {
@@ -191,7 +89,7 @@ function get_scorm_default (&$userdata, $scorm, $scoid, $attempt, $mode) {
     $def['cmi.student_data.time_limit_action'] = scorm_isset($userdata, 'timelimitaction');
     $def['cmi.core.total_time'] = scorm_isset($userdata, 'cmi.core.total_time', '00:00:00');
 
-    // Now handle standard userdata items:
+    // Now handle standard userdata items.
     $def['cmi.core.lesson_location'] = scorm_isset($userdata, 'cmi.core.lesson_location');
     $def['cmi.core.lesson_status'] = scorm_isset($userdata, 'cmi.core.lesson_status');
     $def['cmi.core.score.raw'] = scorm_isset($userdata, 'cmi.core.score.raw');

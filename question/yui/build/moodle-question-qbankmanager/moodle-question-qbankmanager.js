@@ -46,23 +46,34 @@ var manager = {
     _header: null,
 
     /**
-     * The ID of the first checkbox on the page.
+     * A reference to the add to quiz button.
      *
-     * @property _firstCheckboxId
-     * @type String
+     * @property _addbutton
+     * @type Node
      * @private
      */
-    _firstCheckboxId: null,
+    _addbutton: null,
+
+    /**
+     * The ID of the first checkbox on the page.
+     *
+     * @property _firstCheckbox
+     * @type Node
+     * @private
+     */
+    _firstCheckbox: null,
 
     /**
      * Set up the Question Bank Manager.
      *
      * @method init
-     * @param {String} firstCheckboxId The ID of the first checkbox on the page.
      */
-    init: function(firstCheckboxId) {
+    init: function() {
         // Find the header checkbox, and set the initial values.
         this._header = Y.one('#qbheadercheckbox');
+        if (!this._header) {
+            return;
+        }
         this._header.setAttrs({
             disabled: false,
             title: M.util.get_string('selectall', 'moodle')
@@ -70,8 +81,21 @@ var manager = {
 
         this._header.on('click', this._headerClick, this);
 
+        this._addbutton = Y.one('.modulespecificbuttonscontainer input[name="add"]');
+        // input[name="add"] is not always available.
+        if (this._addbutton) {
+            this._addbutton.setAttrs({
+                disabled: true
+            });
+
+            this._header.on('click', this._questionClick, this);
+            Y.one('.categoryquestionscontainer').delegate('change', this._questionClick,
+                'td.checkbox input[type="checkbox"]', this);
+        }
+
         // Store the first checkbox details.
-        this._firstCheckboxId = firstCheckboxId;
+        var table = this._header.ancestor('table');
+        this._firstCheckbox = table.one('tbody tr td.checkbox input');
     },
 
     /**
@@ -86,9 +110,7 @@ var manager = {
                 .all('[type=checkbox],[type=radio]');
 
         // We base the state of all of the questions on the state of the first.
-        firstCheckbox = Y.one('#' + this._firstCheckboxId);
-
-        if (firstCheckbox.get('checked')) {
+        if (this._firstCheckbox.get('checked')) {
             categoryQuestions.set('checked', false);
             this._header.setAttribute('title', M.util.get_string('selectall', 'moodle'));
         } else {
@@ -97,6 +119,19 @@ var manager = {
         }
 
         this._header.set('checked', false);
+    },
+
+    /**
+     * Handle toggling of a question checkbox.
+     *
+     * @method _questionClick
+     * @private
+     */
+    _questionClick: function() {
+        var areChecked = Y.all('td.checkbox input[type="checkbox"]:checked').size();
+        this._addbutton.setAttrs({
+            disabled: (areChecked === 0)
+        });
     }
 };
 

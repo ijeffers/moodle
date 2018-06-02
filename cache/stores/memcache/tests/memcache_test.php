@@ -57,11 +57,13 @@ class cachestore_memcache_test extends cachestore_tests {
         $this->resetAfterTest(true);
 
         $definition = cache_definition::load_adhoc(cache_store::MODE_APPLICATION, 'cachestore_memcache', 'phpunit_test');
-        $instance = cachestore_memcache::initialise_unit_test_instance($definition);
+        $instance = new cachestore_memcache('Memcache Test', cachestore_memcache::unit_test_configuration());
 
-        if (!$instance) { // Something prevented memcache store to be inited (extension, TEST_CACHESTORE_MEMCACHE_TESTSERVERS...).
+        if (!$instance->is_ready()) {
+            // Something prevented memcache store to be inited (extension, TEST_CACHESTORE_MEMCACHE_TESTSERVERS...).
             $this->markTestSkipped();
         }
+        $instance->initialise($definition);
 
         $keys = array(
             // Alphanumeric.
@@ -263,5 +265,31 @@ class cachestore_memcache_test extends cachestore_tests {
                 $this->assertFalse($checkinstance->get($key), "Retrieved purged key `$key` from server 2");
             }
         }
+    }
+
+    /**
+     * Test our checks for encoding.
+     */
+    public function test_require_encoding() {
+        $this->assertTrue(cachestore_memcache::require_encoding('dev'));
+        $this->assertTrue(cachestore_memcache::require_encoding('1.0'));
+        $this->assertTrue(cachestore_memcache::require_encoding('1.0.0'));
+        $this->assertTrue(cachestore_memcache::require_encoding('2.0'));
+        $this->assertTrue(cachestore_memcache::require_encoding('2.0.8'));
+        $this->assertTrue(cachestore_memcache::require_encoding('2.2.8'));
+        $this->assertTrue(cachestore_memcache::require_encoding('3.0'));
+        $this->assertTrue(cachestore_memcache::require_encoding('3.0-dev'));
+        $this->assertTrue(cachestore_memcache::require_encoding('3.0.0'));
+        $this->assertTrue(cachestore_memcache::require_encoding('3.0.1'));
+        $this->assertTrue(cachestore_memcache::require_encoding('3.0.2-dev'));
+        $this->assertTrue(cachestore_memcache::require_encoding('3.0.2'));
+        $this->assertTrue(cachestore_memcache::require_encoding('3.0.3-dev'));
+        $this->assertFalse(cachestore_memcache::require_encoding('3.0.3'));
+        $this->assertFalse(cachestore_memcache::require_encoding('3.0.4'));
+        $this->assertFalse(cachestore_memcache::require_encoding('3.0.4-dev'));
+        $this->assertFalse(cachestore_memcache::require_encoding('3.0.8'));
+        $this->assertFalse(cachestore_memcache::require_encoding('3.1.0'));
+        $this->assertFalse(cachestore_memcache::require_encoding('3.1.2'));
+
     }
 }

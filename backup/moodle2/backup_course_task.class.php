@@ -80,15 +80,21 @@ class backup_course_task extends backup_task {
             $this->add_step(new backup_enrolments_structure_step('course_enrolments', 'enrolments.xml'));
         }
 
-        // Annotate all the groups and groupings belonging to the course
-        $this->add_step(new backup_annotate_course_groups_and_groupings('annotate_course_groups'));
+        // Annotate enrolment custom fields.
+        $this->add_step(new backup_enrolments_execution_step('annotate_enrol_custom_fields'));
+
+        // Annotate all the groups and groupings belonging to the course. This can be optional.
+        if ($this->get_setting_value('groups')) {
+            $this->add_step(new backup_annotate_course_groups_and_groupings('annotate_course_groups'));
+        }
 
         // Annotate the groups used in already annotated groupings (note this may be
         // unnecessary now that we are annotating all the course groups and groupings in the
-        // step above. But we keep it working in case we decide, someday, to introduce one
-        // setting to transform the step above into an optional one. This is here to support
-        // course->defaultgroupingid
-        $this->add_step(new backup_annotate_groups_from_groupings('annotate_groups_from_groupings'));
+        // step above). This is here to support course->defaultgroupingid.
+        // This may not be required to annotate if groups are not being backed up.
+        if ($this->get_setting_value('groups')) {
+            $this->add_step(new backup_annotate_groups_from_groupings('annotate_groups_from_groupings'));
+        }
 
         // Annotate the question_categories belonging to the course context (conditionally).
         if ($this->get_setting_value('questionbank')) {
@@ -115,8 +121,17 @@ class backup_course_task extends backup_task {
 
         // Generate the logs file (conditionally)
         if ($this->get_setting_value('logs')) {
+            // Legacy logs.
             $this->add_step(new backup_course_logs_structure_step('course_logs', 'logs.xml'));
+            // New log stores.
+            $this->add_step(new backup_course_logstores_structure_step('course_logstores', 'logstores.xml'));
         }
+
+        // Generate the course competencies.
+        $this->add_step(new backup_course_competencies_structure_step('course_competencies', 'competencies.xml'));
+
+        // Annotate activity completion defaults.
+        $this->add_step(new backup_completion_defaults_structure_step('course_completion_defaults', 'completiondefaults.xml'));
 
         // Generate the inforef file (must be after ALL steps gathering annotations of ANY type)
         $this->add_step(new backup_inforef_structure_step('course', 'inforef.xml'));
@@ -152,15 +167,25 @@ class backup_course_task extends backup_task {
     /**
      * Helper method, used by encode_content_links.
      * @param string $content content in which to encode links.
-     * @param unknown_type $name the name of this type of encoded link.
-     * @param unknown_type $path the path that identifies this type of link, up
+     * @param string $name the name of this type of encoded link.
+     * @param string $path the path that identifies this type of link, up
      *      to the ?paramname= bit.
      * @return string content with one type of link encoded.
      */
     static private function encode_links_helper($content, $name, $path) {
         global $CFG;
-        $base = preg_quote($CFG->wwwroot . $path, '/');
-        return preg_replace('/(' . $base . ')([0-9]+)/', '$@' . $name . '*$2@$', $content);
+        // We want to convert both http and https links.
+        $root = $CFG->wwwroot;
+        $httpsroot = str_replace('http://', 'https://', $root);
+        $httproot = str_replace('https://', 'http://', $root);
+
+        $httpsbase = preg_quote($httpsroot . $path, '/');
+        $httpbase = preg_quote($httproot . $path, '/');
+
+        $return = preg_replace('/(' . $httpsbase . ')([0-9]+)/', '$@' . $name . '*$2@$', $content);
+        $return = preg_replace('/(' . $httpbase . ')([0-9]+)/', '$@' . $name . '*$2@$', $return);
+
+        return $return;
     }
 
 // Protected API starts here

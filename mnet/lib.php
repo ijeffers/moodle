@@ -56,7 +56,10 @@ function mnet_get_public_key($uri, $application=null) {
         $application = $DB->get_record('mnet_application', array('name'=>'moodle'));
     }
 
-    $rq = xmlrpc_encode_request('system/keyswap', array($CFG->wwwroot, $mnet->public_key, $application->name), array("encoding" => "utf-8"));
+    $rq = xmlrpc_encode_request('system/keyswap', array($CFG->wwwroot, $mnet->public_key, $application->name), array(
+        'encoding' => 'utf-8',
+        'escaping' => 'markup',
+    ));
     $ch = curl_init($uri . $application->xmlrpc_server_url);
 
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
@@ -394,7 +397,7 @@ function mnet_generate_keypair($dn = null, $days=28) {
     );
 
     foreach ($dnlimits as $key => $length) {
-        $dn[$key] = substr($dn[$key], 0, $length);
+        $dn[$key] = core_text::substr($dn[$key], 0, $length);
     }
 
     // ensure we remove trailing slashes

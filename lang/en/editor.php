@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -18,7 +17,7 @@
 /**
  * Strings for component 'editor', language 'en', branch 'MOODLE_20_STABLE'
  *
- * @package   editor
+ * @package   core_editor
  * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -118,6 +117,8 @@ $string['pleaseenteralt'] = 'Please enter the alternate text';
 $string['popupeditor'] = 'Enlarge Editor';
 $string['preformatted'] = 'Preformatted';
 $string['preview'] = 'Preview';
+$string['privacy:metadata:preference:htmleditor'] = 'Text editor preference.';
+$string['privacy:preference:htmleditor'] = 'Your preferred editor to use for writing HTML text is {$a}';
 $string['properties'] = 'Properties';
 $string['redo'] = 'Redo your last action';
 $string['regularexpressions'] = 'Use regular expressions';

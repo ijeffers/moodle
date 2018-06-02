@@ -50,7 +50,7 @@ class cachestore_static_test extends cachestore_tests {
      */
     public function test_maxsize() {
         $defid = 'phpunit/testmaxsize';
-        $config = cache_config_phpunittest::instance();
+        $config = cache_config_testing::instance();
         $config->phpunit_add_definition($defid, array(
             'mode' => cache_store::MODE_REQUEST,
             'component' => 'phpunit',
@@ -116,5 +116,40 @@ class cachestore_static_test extends cachestore_tests {
         ), $instance->get_many(array(
             'key4', 'key5', 'key6', 'key7', 'keyA', 'keyB', 'keyC'
         )));
+    }
+
+    /**
+     * Simple test to verify igbinary availability and check basic serialization is working ok.
+     */
+    public function test_igbinary_serializer() {
+        // Skip if igbinary is not available.
+        if (!extension_loaded('igbinary')) {
+            $this->markTestSkipped('Cannot test igbinary serializer. Extension missing');
+        }
+        // Prepare the static instance.
+        $defid = 'phpunit/igbinary';
+        $config = cache_config_testing::instance();
+        $config->phpunit_add_definition($defid, array(
+            'mode' => cache_store::MODE_REQUEST,
+            'component' => 'phpunit',
+            'area' => 'testigbinary'
+        ));
+        $definition = cache_definition::load($defid, $config->get_definition_by_id($defid));
+        $instance = cachestore_static::initialise_test_instance($definition);
+        // Prepare an object.
+        $obj = new stdClass();
+        $obj->someint = 9;
+        $obj->somestring = '99';
+        $obj->somearray = [9 => 999, '99' => '9999'];
+        // Serialize and set.
+        $objser = igbinary_serialize($obj);
+        $instance->set('testigbinary', $objser);
+        // Get and unserialize.
+        $res = $instance->get('testigbinary');
+        $resunser = igbinary_unserialize($res);
+        // Check expectations.
+        $this->assertSame($objser, $res);     // Ok from cache (ig-serialized, 100% same string).
+        $this->assertEquals($obj, $resunser); // Ok ig-unserialized (equal
+        $this->assertNotSame($obj, $resunser);// but different objects, obviously).
     }
 }

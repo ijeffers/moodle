@@ -36,8 +36,7 @@
     font-weight: bold;
     color: inherit;
 }
-.path-backup .backup_progress .backup_stage.backup_stage_next {
-}
+
 .path-backup .backup_progress span.backup_stage.backup_stage_complete {
     color: inherit;
 }
@@ -120,9 +119,15 @@
 .backup-restore > .singlebutton {
     text-align: right;
 }
-.path-backup .mform .fgroup .proceedbutton {
-    float: right;
-    margin-right: 5%;
+.path-backup .mform .fgroup {
+    .proceedbutton {
+        float: right;
+        margin-right: 5%;
+
+    }
+    .oneclickbackup {
+        float: right;
+    }
 }
 .restore-course-search .rcs-results {
     width: 70%;
@@ -228,4 +233,16 @@
     padding: 10px;
     height: 300px;
     overflow-y: scroll;
+}
+
+@media (max-width: 768px) {
+    .backup-restore .backup-section.settings-section .detail-pair {
+        width: 100%;
+    }
+}
+
+@media (max-width: 900px) {
+    .backup-restore .backup-section.settings-section .detail-pair-label {
+        width: 50%;
+    }
 }

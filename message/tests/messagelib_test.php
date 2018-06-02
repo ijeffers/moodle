@@ -62,19 +62,44 @@ class core_message_messagelib_testcase extends advanced_testcase {
      * @param stdClass $userfrom user object of the one sending the message.
      * @param stdClass $userto user object of the one receiving the message.
      * @param string $message message to send.
+     * @param int $notification if the message is a notification.
+     * @param int $time the time the message was sent
      * @return int the id of the message
      */
-    protected function send_fake_message($userfrom, $userto, $message = 'Hello world!') {
+    protected function send_fake_message($userfrom, $userto, $message = 'Hello world!', $notification = 0, $time = 0) {
         global $DB;
 
+        if (empty($time)) {
+            $time = time();
+        }
+
+        if ($notification) {
+            $record = new stdClass();
+            $record->useridfrom = $userfrom->id;
+            $record->useridto = $userto->id;
+            $record->subject = 'No subject';
+            $record->fullmessage = $message;
+            $record->smallmessage = $message;
+            $record->timecreated = $time;
+
+            return $DB->insert_record('notifications', $record);
+        }
+
+        if (!$conversationid = \core_message\api::get_conversation_between_users([$userfrom->id, $userto->id])) {
+            $conversationid = \core_message\api::create_conversation_between_users([$userfrom->id,
+                $userto->id]);
+        }
+
+        // Ok, send the message.
         $record = new stdClass();
         $record->useridfrom = $userfrom->id;
-        $record->useridto = $userto->id;
+        $record->conversationid = $conversationid;
         $record->subject = 'No subject';
         $record->fullmessage = $message;
-        $record->timecreated = time();
+        $record->smallmessage = $message;
+        $record->timecreated = $time;
 
-        return $DB->insert_record('message', $record);
+        return $DB->insert_record('messages', $record);
     }
 
     /**
@@ -93,10 +118,17 @@ class core_message_messagelib_testcase extends advanced_testcase {
         message_add_contact($user2->id, 1);
 
         $this->assertCount(1, message_get_blocked_users());
+        $this->assertDebuggingCalled();
 
         // Block other user.
         message_block_contact($user1->id);
         $this->assertCount(2, message_get_blocked_users());
+        $this->assertDebuggingCalled();
+
+        // Test deleting users.
+        delete_user($user1);
+        $this->assertCount(1, message_get_blocked_users());
+        $this->assertDebuggingCalled();
     }
 
     /**
@@ -126,6 +158,7 @@ class core_message_messagelib_testcase extends advanced_testcase {
         $this->send_fake_message($user3, $USER);
 
         list($onlinecontacts, $offlinecontacts, $strangers) = message_get_contacts();
+        $this->assertDebuggingCalled();
         $this->assertCount(0, $onlinecontacts);
         $this->assertCount(2, $offlinecontacts);
         $this->assertCount(1, $strangers);
@@ -134,6 +167,7 @@ class core_message_messagelib_testcase extends advanced_testcase {
         $this->send_fake_message($noreplyuser, $USER);
         $this->send_fake_message($supportuser, $USER);
         list($onlinecontacts, $offlinecontacts, $strangers) = message_get_contacts();
+        $this->assertDebuggingCalled();
         $this->assertCount(0, $onlinecontacts);
         $this->assertCount(2, $offlinecontacts);
         $this->assertCount(3, $strangers);
@@ -141,6 +175,7 @@ class core_message_messagelib_testcase extends advanced_testcase {
         // Block 1 user.
         message_block_contact($user2->id);
         list($onlinecontacts, $offlinecontacts, $strangers) = message_get_contacts();
+        $this->assertDebuggingCalled();
         $this->assertCount(0, $onlinecontacts);
         $this->assertCount(1, $offlinecontacts);
         $this->assertCount(3, $strangers);
@@ -148,35 +183,21 @@ class core_message_messagelib_testcase extends advanced_testcase {
         // Noreply user being valid user.
         core_user::reset_internal_users();
         $CFG->noreplyuserid = $user3->id;
-        $noreplyuser = core_user::get_noreply_user();
         list($onlinecontacts, $offlinecontacts, $strangers) = message_get_contacts();
+        $this->assertDebuggingCalled();
         $this->assertCount(0, $onlinecontacts);
         $this->assertCount(1, $offlinecontacts);
         $this->assertCount(2, $strangers);
-    }
 
-    /**
-     * Test message_count_messages.
-     */
-    public function test_message_count_messages() {
-        global $DB;
-
-        // Create users to send and receive message.
-        $userfrom = $this->getDataGenerator()->create_user();
-        $userto = $this->getDataGenerator()->create_user();
-
-        message_post_message($userfrom, $userto, 'Message 1', FORMAT_PLAIN);
-        message_post_message($userfrom, $userto, 'Message 2', FORMAT_PLAIN);
-        message_post_message($userto, $userfrom, 'Message 3', FORMAT_PLAIN);
-
-        // Return 0 when no message.
-        $messages = array();
-        $this->assertEquals(0, message_count_messages($messages, 'Test', 'Test'));
-
-        // Check number of messages from userfrom and userto.
-        $messages = $this->messagesink->get_messages();
-        $this->assertEquals(2, message_count_messages($messages, 'useridfrom', $userfrom->id));
-        $this->assertEquals(1, message_count_messages($messages, 'useridfrom', $userto->id));
+        // Test deleting users.
+        delete_user($user1);
+        delete_user($user3);
+        core_user::reset_internal_users();
+        list($onlinecontacts, $offlinecontacts, $strangers) = message_get_contacts();
+        $this->assertDebuggingCalled();
+        $this->assertCount(0, $onlinecontacts);
+        $this->assertCount(0, $offlinecontacts);
+        $this->assertCount(1, $strangers);
     }
 
     /**
@@ -199,25 +220,54 @@ class core_message_messagelib_testcase extends advanced_testcase {
     }
 
     /**
-     * Test message_count_blocked_users.
-     *
+     * Test message_count_unread_messages with read messages.
      */
-    public function test_message_count_blocked_users() {
-        // Set this user as the admin.
-        $this->setAdminUser();
+    public function test_message_count_unread_messages_with_read_messages() {
+        global $DB;
 
-        // Create users to add to the admin's contact list.
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
+        // Create users to send and receive messages.
+        $userfrom1 = $this->getDataGenerator()->create_user();
+        $userfrom2 = $this->getDataGenerator()->create_user();
+        $userto = $this->getDataGenerator()->create_user();
 
-        $this->assertEquals(0, message_count_blocked_users());
+        $this->assertEquals(0, message_count_unread_messages($userto));
 
-        // Add 1 blocked and 1 normal contact to admin's contact list.
-        message_add_contact($user1->id);
-        message_add_contact($user2->id, 1);
+        // Send fake messages.
+        $messageid = $this->send_fake_message($userfrom1, $userto);
+        $this->send_fake_message($userfrom2, $userto);
 
-        $this->assertEquals(0, message_count_blocked_users($user2));
-        $this->assertEquals(1, message_count_blocked_users());
+        // Mark message as read.
+        $message = $DB->get_record('messages', ['id' => $messageid]);
+        \core_message\api::mark_message_as_read($userto->id, $message);
+
+        // Should only count the messages that weren't read by the current user.
+        $this->assertEquals(1, message_count_unread_messages($userto));
+        $this->assertEquals(0, message_count_unread_messages($userto, $userfrom1));
+    }
+
+    /**
+     * Test message_count_unread_messages with deleted messages.
+     */
+    public function test_message_count_unread_messages_with_deleted_messages() {
+        global $DB;
+
+        // Create users to send and receive messages.
+        $userfrom1 = $this->getDataGenerator()->create_user();
+        $userfrom2 = $this->getDataGenerator()->create_user();
+        $userto = $this->getDataGenerator()->create_user();
+
+        $this->assertEquals(0, message_count_unread_messages($userto));
+
+        // Send fake messages.
+        $messageid = $this->send_fake_message($userfrom1, $userto);
+        $this->send_fake_message($userfrom2, $userto);
+
+        // Delete a message.
+        \core_message\api::delete_message($userto->id, $messageid);
+
+        // Should only count the messages that weren't deleted by the current user.
+        $this->assertEquals(1, message_count_unread_messages($userto));
+        $this->assertEquals(0, message_count_unread_messages($userto, $userfrom1));
     }
 
     /**
@@ -240,7 +290,7 @@ class core_message_messagelib_testcase extends advanced_testcase {
         $this->assertNotEmpty(message_get_contact($user1->id));
         $this->assertNotEmpty(message_get_contact($user2->id));
         $this->assertEquals(false, message_get_contact($user3->id));
-        $this->assertEquals(1, message_count_blocked_users());
+        $this->assertEquals(1, \core_message\api::count_blocked_users());
     }
 
     /**
@@ -277,11 +327,11 @@ class core_message_messagelib_testcase extends advanced_testcase {
         message_add_contact($user1->id);
         message_add_contact($user2->id);
 
-        $this->assertEquals(0, message_count_blocked_users());
+        $this->assertEquals(0, \core_message\api::count_blocked_users());
 
         // Block 1 user.
         message_block_contact($user2->id);
-        $this->assertEquals(1, message_count_blocked_users());
+        $this->assertEquals(1, \core_message\api::count_blocked_users());
 
     }
 
@@ -300,11 +350,11 @@ class core_message_messagelib_testcase extends advanced_testcase {
         message_add_contact($user1->id);
         message_add_contact($user2->id, 1); // Add blocked contact.
 
-        $this->assertEquals(1, message_count_blocked_users());
+        $this->assertEquals(1, \core_message\api::count_blocked_users());
 
         // Unblock user.
         message_unblock_contact($user2->id);
-        $this->assertEquals(0, message_count_blocked_users());
+        $this->assertEquals(0, \core_message\api::count_blocked_users());
     }
 
     /**
@@ -326,142 +376,5 @@ class core_message_messagelib_testcase extends advanced_testcase {
         $this->assertCount(2, message_search_users(0, 'Test'));
         $this->assertCount(1, message_search_users(0, 'user1'));
         $this->assertCount(2, message_search_users(0, 'user'));
-    }
-
-    /**
-     * Test message_search.
-     */
-    public function test_message_search() {
-        global $USER;
-
-        // Set this user as the admin.
-        $this->setAdminUser();
-
-        // Create a user to add to the admin's contact list.
-        $user1 = $this->getDataGenerator()->create_user(array('firstname' => 'Test1', 'lastname' => 'user1'));
-        $user2 = $this->getDataGenerator()->create_user(array('firstname' => 'Test2', 'lastname' => 'user2'));
-
-        // Send few messages, real (read).
-        message_post_message($user1, $USER, 'Message 1', FORMAT_PLAIN);
-        message_post_message($USER, $user1, 'Message 2', FORMAT_PLAIN);
-        message_post_message($USER, $user2, 'Message 3', FORMAT_PLAIN);
-
-        $this->assertCount(2, message_search(array('Message'), true, false));
-        $this->assertCount(3, message_search(array('Message'), true, true));
-
-        // Send fake message (not-read).
-        $this->send_fake_message($USER, $user1, 'Message 4');
-        $this->send_fake_message($user1, $USER, 'Message 5');
-        $this->assertCount(3, message_search(array('Message'), true, false));
-        $this->assertCount(5, message_search(array('Message'), true, true));
-
-        // If courseid given then should be 0.
-        $this->assertEquals(false, message_search(array('Message'), true, true, ''));
-        $this->assertEquals(false, message_search(array('Message'), true, true, 2));
-        $this->assertCount(5, message_search(array('Message'), true, true, SITEID));
-    }
-
-    /**
-     * Test message_get_recent_conversations.
-     */
-    public function test_message_get_recent_conversations() {
-        global $DB, $USER;
-
-        // Set this user as the admin.
-        $this->setAdminUser();
-
-        // Create user's to send messages to/from.
-        $user1 = $this->getDataGenerator()->create_user(array('firstname' => 'Test1', 'lastname' => 'user1'));
-        $user2 = $this->getDataGenerator()->create_user(array('firstname' => 'Test2', 'lastname' => 'user2'));
-
-        // Add a few messages that have been read and some that are unread.
-        $m1 = $this->send_fake_message($USER, $user1, 'Message 1'); // An unread message.
-        $m2 = $this->send_fake_message($user1, $USER, 'Message 2'); // An unread message.
-        $m3 = $this->send_fake_message($USER, $user1, 'Message 3'); // An unread message.
-        $m4 = message_post_message($USER, $user2, 'Message 4', FORMAT_PLAIN);
-        $m5 = message_post_message($user2, $USER, 'Message 5', FORMAT_PLAIN);
-        $m6 = message_post_message($USER, $user2, 'Message 6', FORMAT_PLAIN);
-
-        // We want to alter the timecreated values so we can ensure message_get_recent_conversations orders
-        // by timecreated, not the max id, to begin with. However, we also want more than one message to have
-        // the same timecreated value to ensure that when this happens we retrieve the one with the maximum id.
-
-        // Store the current time.
-        $time = time();
-
-        // Set the first and second unread messages to have the same timecreated value.
-        $updatemessage = new stdClass();
-        $updatemessage->id = $m1;
-        $updatemessage->timecreated = $time;
-        $DB->update_record('message', $updatemessage);
-
-        $updatemessage->id = $m2;
-        $updatemessage->timecreated = $time;
-        $DB->update_record('message', $updatemessage);
-
-        // Set the third unread message to have a timecreated value of 0.
-        $updatemessage->id = $m3;
-        $updatemessage->timecreated = 0;
-        $DB->update_record('message', $updatemessage);
-
-        // Set the first and second read messages to have the same timecreated value.
-        $updatemessage->id = $m4;
-        $updatemessage->timecreated = $time + 1;
-        $DB->update_record('message', $updatemessage);
-
-        $updatemessage->id = $m5;
-        $updatemessage->timecreated = $time + 1;
-        $DB->update_record('message', $updatemessage);
-
-        // Set the third read message to have a timecreated value of 0.
-        $updatemessage->id = $m6;
-        $updatemessage->timecreated = 0;
-        $DB->update_record('message_read', $updatemessage);
-
-        // Get the recent conversations for the current user.
-        $conversations = message_get_recent_conversations($USER);
-
-        // Confirm that we have received the messages with the maximum timecreated, rather than the max id.
-        $this->assertEquals('Message 2', $conversations[0]->fullmessage);
-        $this->assertEquals('Message 5', $conversations[1]->smallmessage);
-    }
-
-    /**
-     * Test message_get_recent_notifications.
-     */
-    public function test_message_get_recent_notifications() {
-        global $DB, $USER;
-
-        // Set this user as the admin.
-        $this->setAdminUser();
-
-        // Create a user to send messages from.
-        $user1 = $this->getDataGenerator()->create_user(array('firstname' => 'Test1', 'lastname' => 'user1'));
-
-        // Add two messages - will mark them as notifications later.
-        $m1 = message_post_message($user1, $USER, 'Message 1', FORMAT_PLAIN);
-        $m2 = message_post_message($user1, $USER, 'Message 2', FORMAT_PLAIN);
-
-        // Mark the second message as a notification.
-        $updatemessage = new stdClass();
-        $updatemessage->id = $m2;
-        $updatemessage->notification = 1;
-        $DB->update_record('message_read', $updatemessage);
-
-        // Mark the first message as a notification and change the timecreated to 0.
-        $updatemessage->id = $m1;
-        $updatemessage->notification = 1;
-        $updatemessage->timecreated = 0;
-        $DB->update_record('message_read', $updatemessage);
-
-        $notifications = message_get_recent_notifications($USER);
-
-        // Get the messages.
-        $firstmessage = array_shift($notifications);
-        $secondmessage = array_shift($notifications);
-
-        // Confirm that we have received the notifications with the maximum timecreated, rather than the max id.
-        $this->assertEquals('Message 2', $firstmessage->smallmessage);
-        $this->assertEquals('Message 1', $secondmessage->smallmessage);
     }
 }

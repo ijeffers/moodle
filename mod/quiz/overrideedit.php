@@ -23,7 +23,7 @@
  */
 
 
-require_once(dirname(__FILE__) . '/../../config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot.'/mod/quiz/lib.php');
 require_once($CFG->dirroot.'/mod/quiz/locallib.php');
 require_once($CFG->dirroot.'/mod/quiz/override_form.php');
@@ -43,17 +43,12 @@ if ($overrideid) {
     if (! $quiz = $DB->get_record('quiz', array('id' => $override->quiz))) {
         print_error('invalidcoursemodule');
     }
-    if (! $cm = get_coursemodule_from_instance("quiz", $quiz->id, $quiz->course)) {
-        print_error('invalidcoursemodule');
-    }
-} else if ($cmid) {
+    list($course, $cm) = get_course_and_cm_from_instance($quiz, 'quiz');
 
-    if (! $cm = get_coursemodule_from_id('quiz', $cmid)) {
-        print_error('invalidcoursemodule');
-    }
-    if (! $quiz = $DB->get_record('quiz', array('id' => $cm->instance))) {
-        print_error('invalidcoursemodule');
-    }
+} else if ($cmid) {
+    list($course, $cm) = get_course_and_cm_from_cmid($cmid, 'quiz');
+    $quiz = $DB->get_record('quiz', array('id' => $cm->instance), '*', MUST_EXIST);
+
 } else {
     print_error('invalidcoursemodule');
 }
@@ -203,7 +198,13 @@ if ($mform->is_cancelled()) {
     }
 
     quiz_update_open_attempts(array('quizid'=>$quiz->id));
-    quiz_update_events($quiz, $fromform);
+    if ($groupmode) {
+        // Priorities may have shifted, so we need to update all of the calendar events for group overrides.
+        quiz_update_events($quiz);
+    } else {
+        // User override. We only need to update the calendar event for this user override.
+        quiz_update_events($quiz, $fromform);
+    }
 
     if (!empty($fromform->submitbutton)) {
         redirect($overridelisturl);

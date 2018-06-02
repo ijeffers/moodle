@@ -8,7 +8,7 @@ Feature: Edit course settings
   Scenario: Edit course settings
     Given the following "users" exist:
       | username | firstname | lastname | email |
-      | teacher1 | Teacher | 1 | teacher1@asd.com |
+      | teacher1 | Teacher | 1 | teacher1@example.com |
     And the following "courses" exist:
       | fullname | shortname | summary | format |
       | Course 1 | C1 | <p>Course summary</p> | topics |
@@ -16,21 +16,41 @@ Feature: Edit course settings
       | user | course | role |
       | teacher1 | C1 | editingteacher |
     And I log in as "teacher1"
-    And I follow "Course 1"
-    When I click on "Edit settings" "link" in the "Administration" "block"
+    And I am on "Course 1" course homepage
+    When I navigate to "Edit settings" in current page administration
     And I set the following fields to these values:
       | Course full name | Edited course fullname |
       | Course short name | Edited course shortname |
       | Course summary | Edited course summary |
-    And I press "Save changes"
+    And I press "Save and display"
     And I follow "Edited course fullname"
     Then I should not see "Course 1"
     And I should not see "C1"
     And I should see "Edited course fullname"
     And I should see "Edited course shortname"
-    And I click on "Edit settings" "link" in the "Administration" "block"
+    And I navigate to "Edit settings" in current page administration
     And the field "Course full name" matches value "Edited course fullname"
     And the field "Course short name" matches value "Edited course shortname"
     And the field "Course summary" matches value "Edited course summary"
-    And I am on homepage
+    And I am on site homepage
     And I should see "Edited course fullname"
+
+  Scenario: Edit course settings and return to the management interface
+    Given the following "categories" exist:
+      | name | category | idnumber |
+      | Cat 1 | 0 | CAT1 |
+    And the following "courses" exist:
+      | category | fullname | shortname | idnumber |
+      | CAT1 | Course 1 | Course 1 | C1 |
+    And I log in as "admin"
+    And I go to the courses management page
+    And I should see the "Categories" management page
+    And I click on category "Cat 1" in the management interface
+    And I should see the "Course categories and courses" management page
+    When I click on "edit" action for "Course 1" in management course listing
+    And I set the following fields to these values:
+      | Course full name | Edited course fullname |
+      | Course short name | Edited course shortname |
+      | Course summary | Edited course summary |
+    And I press "Save and return"
+    Then I should see the "Course categories and courses" management page

@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -18,7 +17,7 @@
 /**
  * Strings for component 'repository', language 'en', branch 'MOODLE_20_STABLE'
  *
- * @package   repository
+ * @package   core_repository
  * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -28,11 +27,12 @@ $string['activaterep'] = 'Active repositories';
 $string['activerepository'] = 'Available repository plugins';
 $string['add'] = 'Add';
 $string['addfile'] = 'Add...';
+$string['addfiletext'] = 'Add file';
 $string['addplugin'] = 'Add a repository plugin';
 $string['allowexternallinks'] = 'Allow external links';
 $string['areamainfile'] = 'Main file';
 $string['coursebackup'] = 'Course backups';
-$string['pluginname'] = 'Repository plugin name'; // todo fix this, this string identifier is reserved
+$string['pluginname'] = 'Repository plugin name'; // Todo fix this, this string identifier is reserved.
 $string['pluginnamehelp'] = 'If you leave this empty the default name will be used.';
 $string['sectionbackup'] = 'Section backups';
 $string['activitybackup'] = 'Activity backup';
@@ -61,16 +61,16 @@ $string['close'] = 'Close';
 $string['commonrepositorysettings'] = 'Common repository settings';
 $string['configallowexternallinks'] = 'This option enables all users to choose whether or not external media is copied into Moodle or not. If this is off then media is always copied into Moodle (this is usually best for overall data integrity and security).  If this is on then users can choose each time they add media to a text.';
 $string['configcacheexpire'] = 'The amount of time that file listings are cached locally (in seconds) when browsing external repositories.';
-$string['configgetfiletimeout'] = 'Timeout in seconds for downloading the external file into moodle.';
+$string['configgetfiletimeout'] = 'Timeout in seconds for downloading an external file into Moodle.';
 $string['configsaved'] = 'Configuration saved!';
 $string['configsyncfiletimeout'] = 'Timeout in seconds for syncronising the external file size.';
 $string['configsyncimagetimeout'] = 'Timeout in seconds for downloading an image file from external repository during syncronisation.';
-$string['confirmdelete'] = 'Are you sure you want to delete this repository - {$a}? If you choose "Continue and download", file references to external contents will be downloaded to moodle, but it could take long time to process.';
+$string['confirmdelete'] = 'Are you sure you want to delete the repository {$a}? If you choose "Continue and download", file references to external contents will be downloaded to Moodle. This could take a long time to process.';
 $string['confirmdeletefile'] = 'Are you sure you want to delete this file?';
 $string['confirmrenamefile'] = 'Are you sure you want to rename/move this file? There are {$a} alias/shortcut files that use this file as their source. If you proceed then those aliases will be converted to true copies.';
 $string['confirmdeletefilewithhref'] = 'Are you sure you want to delete this file? There are {$a} alias/shortcut files that use this file as their source. If you proceed then those aliases will be converted to true copies.';
 $string['confirmdeletefolder'] = 'Are you sure you want to delete this folder? All files and subfolders will be deleted.';
-$string['confirmremove'] = 'Are you sure you want to remove this repository plugin, its options and <strong>all of its instances</strong> - {$a}? If you choose "Continue and download", file references to external contents will be downloaded to moodle, but it could take long time to process.';
+$string['confirmremove'] = 'Are you sure you want to remove this repository plugin, its options and <strong>all of its instances</strong> - {$a}? If you choose "Continue and download", file references to external contents will be downloaded to Moodle. This could take a long time to process.';
 $string['confirmrenamefolder'] = ' Are you sure you want to move/rename this folder? Any alias/shortcut files that reference files in this folder will be converted into true copies.';
 $string['continueuninstall'] = 'Continue';
 $string['continueuninstallanddownload'] = 'Continue and download';
@@ -88,10 +88,14 @@ $string['deleterepository'] = 'Delete this repository';
 $string['detailview'] = 'View details';
 $string['dimensions'] = 'Dimensions';
 $string['disabled'] = 'Disabled';
+$string['displayasdetails'] = 'Display as file details';
+$string['displayasicons'] = 'Display as file icons';
+$string['displayastree'] = 'Display as file tree';
 $string['displaydetails'] = 'Display folder with file details';
 $string['displayicons'] = 'Display folder with file icons';
 $string['displaytree'] = 'Display folder as file tree';
 $string['download'] = 'Download';
+$string['downloadallfiles'] = 'Download all files';
 $string['downloadfolder'] = 'Download all';
 $string['downloadsucc'] = 'The file has been downloaded successfully';
 $string['draftareanofiles'] = 'Cannot be downloaded because there is no files attached';
@@ -107,7 +111,7 @@ $string['error'] = 'An unknown error occurred!';
 $string['errordoublereference'] = 'Unable to overwrite file with a shortcut/alias because shortcuts to this file already exist.';
 $string['errornotyourfile'] = 'You cannot pick file which is not added by your';
 $string['erroruniquename'] = 'Repository instance name should be unique';
-$string['errorpostmaxsize'] = 'The uploaded file may exceed the post_max_size directive in php.ini.';
+$string['errorpostmaxsize'] = 'The file you tried to upload is too large for the server to process.';
 $string['errorwhilecommunicatingwith'] = 'Error while communicating with the repository \'{$a}\'.';
 $string['errorwhiledownload'] = 'An error occurred while downloading the file: {$a}';
 $string['existingrepository'] = 'This repository already exists';
@@ -126,10 +130,10 @@ $string['foldernotfound'] = 'Folder not found';
 $string['folderrecurse'] = 'Folder can not be moved to it\'s own subfolder';
 $string['getfile'] = 'Select this file';
 $string['getfiletimeout'] = 'Get file timeout';
-$string['hidden'] = 'Hidden';
 $string['help'] = 'Help';
 $string['choosealink'] = 'Choose a link...';
 $string['chooselicense'] = 'Choose license';
+$string['createfolder'] = 'Create folder';
 $string['iconview'] = 'View as icons';
 $string['imagesize'] = '{$a->width} x {$a->height} px';
 $string['instance'] = 'instance';
@@ -150,15 +154,19 @@ $string['license'] = 'License';
 $string['linkexternal'] = 'Link external';
 $string['listview'] = 'View as list';
 $string['loading'] = 'Loading...';
-$string['login'] = 'Login to your account';
+$string['login'] = 'Log in to your account';
+$string['logintoaccount'] = 'Log in to your {$a} account';
 $string['logout'] = 'Logout';
 $string['lostsource'] = 'Error. Source is missing. {$a}';
 $string['makefileinternal'] = 'Make a copy of the file';
 $string['makefilelink'] = 'Link to the file directly';
 $string['makefilereference'] = 'Create an alias/shortcut to the file';
+$string['makefilecontrolledlink'] = 'Create an access controlled link to the file';
 $string['manage'] = 'Manage repositories';
+$string['manageinstances'] = 'Manage instances';
 $string['manageurl'] = 'Manage';
 $string['manageuserrepository'] = 'Manage individual repository';
+$string['missingsourcekey'] = 'The source key is missing. This key must also be provided to retrieve the file.';
 $string['moving'] = 'Moving';
 $string['name'] = 'Name';
 $string['newfolder'] = 'New folder';
@@ -181,10 +189,9 @@ $string['on'] = 'Enabled and visible';
 $string['overwrite'] = 'Overwrite';
 $string['overwriteall'] = 'Overwrite all';
 $string['path'] = 'Path';
-$string['personalrepositories'] = 'Available repository instances';
 $string['plugin'] = 'Repository plug-ins';
 $string['pluginerror'] = 'Errors in repository plugin.';
-$string['popup'] = 'Click "Login" button to login';
+$string['popup'] = 'Click "Login" button to log in';
 $string['popupblockeddownload'] = 'The downloading window is blocked, please allow the popup window, and try again.';
 $string['preview'] = 'Preview';
 $string['privatefilesof'] = '{$a} Private files';
@@ -216,6 +223,7 @@ $string['setmainfile'] = 'Set main file';
 $string['setmainfile_help'] = 'If there are multiple files in the folder, the main file is the one that appears on the view page. Other files such as images or videos may be embedded in it. In filemanager the main file is indicated with a title in bold.';
 $string['siteinstances'] = 'Repositories instances of the site';
 $string['size'] = 'Size';
+$string['sourcekeymismatch'] = 'The source URL does not match the source key.';
 $string['submit'] = 'Submit';
 $string['sync'] = 'Sync';
 $string['syncfiletimeout'] = 'Sync file timeout';
@@ -228,6 +236,7 @@ $string['unknownoriginal'] = 'Unknown';
 $string['upload'] = 'Upload this file';
 $string['uploading'] = 'Uploading...';
 $string['uploadsucc'] = 'The file has been uploaded successfully';
+$string['unknownsource'] = 'Unknown source';
 $string['undisclosedsource'] = '(Undisclosed)';
 $string['undisclosedreference'] = '(Undisclosed)';
 $string['uselatestfile'] = 'Use latest file';
@@ -236,5 +245,14 @@ $string['usenonjsfilemanager'] = 'Open file manager in new window';
 $string['usenonjsfilepicker'] = 'Open file picker in new window';
 $string['unzipped'] = 'Unzipped successfully';
 $string['wrongcontext'] = 'You cannot access to this context';
-$string['xhtmlerror'] = 'You are probably using XHTML strict header, some YUI Component doesn\'t work in this mode, please turn it off in moodle';
+$string['xhtmlerror'] = 'You are probably using an XHTML strict header. Certain YUI components don\'t work in this mode; please turn it off.';
 $string['ziped'] = 'Compress folder successfully';
+$string['privacy:metadata:repository'] = 'The Repository component stores the repository types within the core subsystem.';
+$string['privacy:metadata:repository_instances'] = 'The Repository plug-ins component stores user repository instances data within the core subsystem.';
+$string['privacy:metadata:repository_instances:name'] = 'The custom name of the repository instance.';
+$string['privacy:metadata:repository_instances:typeid'] = 'The ID type of the repository instance.';
+$string['privacy:metadata:repository_instances:userid'] = 'The ID of the user owning the repository instance.';
+$string['privacy:metadata:repository_instances:username'] = 'The optional username configured for the repository instance.';
+$string['privacy:metadata:repository_instances:password'] = 'The optional password configured for the repository instance.';
+$string['privacy:metadata:repository_instances:timecreated'] = 'The date/time of creation for the repository instance.';
+$string['privacy:metadata:repository_instances:timemodified'] = 'The date/time of modification of the repository instance.';

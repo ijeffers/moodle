@@ -15,12 +15,13 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 require_once("../../config.php");
+require_once($CFG->dirroot.'/mod/scorm/lib.php');
 require_once($CFG->dirroot.'/mod/scorm/locallib.php');
 require_once($CFG->dirroot.'/course/lib.php');
 
 $id = optional_param('id', '', PARAM_INT);       // Course Module ID, or
 $a = optional_param('a', '', PARAM_INT);         // scorm ID
-$organization = optional_param('organization', '', PARAM_INT); // organization ID
+$organization = optional_param('organization', '', PARAM_INT); // organization ID.
 $action = optional_param('action', '', PARAM_ALPHA);
 $preventskip = optional_param('preventskip', '', PARAM_INT); // Prevent Skip view, set by javascript redirects.
 
@@ -69,20 +70,27 @@ if (!empty($scorm->popup)) {
 
     $scoid = 0;
     $orgidentifier = '';
-    if ($sco = scorm_get_sco($scorm->launch, SCO_ONLY)) {
-        if (($sco->organization == '') && ($sco->launch == '')) {
-            $orgidentifier = $sco->identifier;
-        } else {
-            $orgidentifier = $sco->organization;
+
+    $result = scorm_get_toc($USER, $scorm, $cm->id, TOCFULLURL);
+    // Set last incomplete sco to launch first.
+    if (!empty($result->sco->id)) {
+        $scoid = $result->sco->id;
+    } else {
+        if ($sco = scorm_get_sco($scorm->launch, SCO_ONLY)) {
+            if (($sco->organization == '') && ($sco->launch == '')) {
+                $orgidentifier = $sco->identifier;
+            } else {
+                $orgidentifier = $sco->organization;
+            }
+            $scoid = $sco->id;
         }
-        $scoid = $sco->id;
     }
 
     if (empty($preventskip) && $scorm->skipview >= SCORM_SKIPVIEW_FIRST &&
         has_capability('mod/scorm:skipview', $contextmodule) &&
         !has_capability('mod/scorm:viewreport', $contextmodule)) { // Don't skip users with the capability to view reports.
 
-        // do we launch immediately and redirect the parent back ?
+        // Do we launch immediately and redirect the parent back ?
         if ($scorm->skipview == SCORM_SKIPVIEW_ALWAYS || !scorm_has_tracks($scorm->id, $USER->id)) {
             $launch = true;
         }
@@ -90,14 +98,10 @@ if (!empty($scorm->popup)) {
     // Redirect back to the section with one section per page ?
 
     $courseformat = course_get_format($course)->get_course();
-    $sectionid = '';
-    if (isset($courseformat->coursedisplay) && $courseformat->coursedisplay == COURSE_DISPLAY_MULTIPAGE) {
-        $sectionid = $cm->sectionnum;
-    }
     if ($courseformat->format == 'singleactivity') {
         $courseurl = $url->out(false, array('preventskip' => '1'));
     } else {
-        $courseurl = course_get_url($course, $sectionid)->out(false);
+        $courseurl = course_get_url($course, $cm->sectionnum)->out(false);
     }
     $PAGE->requires->data_for_js('scormplayerdata', Array('launch' => $launch,
                                                            'currentorg' => $orgidentifier,
@@ -123,22 +127,14 @@ $shortname = format_string($course->shortname, true, array('context' => $context
 $pagetitle = strip_tags($shortname.': '.format_string($scorm->name));
 
 // Trigger module viewed event.
-$event = \mod_scorm\event\course_module_viewed::create(array(
-    'objectid' => $scorm->id,
-    'context' => $contextmodule,
-));
-$event->add_record_snapshot('course', $course);
-$event->add_record_snapshot('scorm', $scorm);
-$event->add_record_snapshot('course_modules', $cm);
-$event->trigger();
+scorm_view($scorm, $course, $cm, $contextmodule);
 
 if (empty($preventskip) && empty($launch) && (has_capability('mod/scorm:skipview', $contextmodule))) {
     scorm_simple_play($scorm, $USER, $contextmodule, $cm->id);
 }
 
-//
-// Print the page header
-//
+// Print the page header.
+
 $PAGE->set_title($pagetitle);
 $PAGE->set_heading($course->fullname);
 echo $OUTPUT->header();
@@ -151,7 +147,7 @@ if (!empty($action) && confirm_sesskey() && has_capability('mod/scorm:deleteownr
         echo $OUTPUT->footer();
         exit;
     } else if ($action == 'deleteconfirm') {
-        // delete this users attempts.
+        // Delete this users attempts.
         $DB->delete_records('scorm_scoes_track', array('userid' => $USER->id, 'scormid' => $scorm->id));
         scorm_update_grades($scorm, $USER->id, true);
         echo $OUTPUT->notification(get_string('scormresponsedeleted', 'scorm'), 'notifysuccess');
@@ -161,29 +157,27 @@ if (!empty($action) && confirm_sesskey() && has_capability('mod/scorm:deleteownr
 $currenttab = 'info';
 require($CFG->dirroot . '/mod/scorm/tabs.php');
 
-// Print the main part of the page
+// Print the main part of the page.
 $attemptstatus = '';
 if (empty($launch) && ($scorm->displayattemptstatus == SCORM_DISPLAY_ATTEMPTSTATUS_ALL ||
          $scorm->displayattemptstatus == SCORM_DISPLAY_ATTEMPTSTATUS_ENTRY)) {
     $attemptstatus = scorm_get_attempt_status($USER, $scorm, $cm);
 }
-echo $OUTPUT->box(format_module_intro('scorm', $scorm, $cm->id).$attemptstatus, 'generalbox boxaligncenter boxwidthwide', 'intro');
+echo $OUTPUT->box(format_module_intro('scorm', $scorm, $cm->id).$attemptstatus, 'container', 'intro');
 
-$scormopen = true;
-$timenow = time();
-if (!empty($scorm->timeopen) && $scorm->timeopen > $timenow) {
-    echo $OUTPUT->box(get_string("notopenyet", "scorm", userdate($scorm->timeopen)), "generalbox boxaligncenter");
-    $scormopen = false;
+// Check if SCORM available.
+list($available, $warnings) = scorm_get_availability_status($scorm);
+if (!$available) {
+    $reason = current(array_keys($warnings));
+    echo $OUTPUT->box(get_string($reason, "scorm", $warnings[$reason]), "container");
 }
-if (!empty($scorm->timeclose) && $timenow > $scorm->timeclose) {
-    echo $OUTPUT->box(get_string("expired", "scorm", userdate($scorm->timeclose)), "generalbox boxaligncenter");
-    $scormopen = false;
-}
-if ($scormopen && empty($launch)) {
-    scorm_view_display($USER, $scorm, 'view.php?id='.$cm->id, $cm);
+
+if ($available && empty($launch)) {
+    scorm_print_launch($USER, $scorm, 'view.php?id='.$cm->id, $cm);
 }
 if (!empty($forcejs)) {
-    echo $OUTPUT->box(get_string("forcejavascriptmessage", "scorm"), "generalbox boxaligncenter forcejavascriptmessage");
+    $message = $OUTPUT->box(get_string("forcejavascriptmessage", "scorm"), "container forcejavascriptmessage");
+    echo html_writer::tag('noscript', $message);
 }
 
 if (!empty($scorm->popup)) {

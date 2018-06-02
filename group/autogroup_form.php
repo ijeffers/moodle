@@ -82,18 +82,14 @@ class autogroup_form extends moodleform {
             $mform->setDefault('roleid', $student->id);
         }
 
-        $context = context_course::instance($COURSE->id);
-        if (has_capability('moodle/cohort:view', $context)) {
-            $options = cohort_get_visible_list($COURSE);
-            if ($options) {
-                $options = array(0=>get_string('anycohort', 'cohort')) + $options;
-                $mform->addElement('select', 'cohortid', get_string('selectfromcohort', 'cohort'), $options);
-                $mform->setDefault('cohortid', '0');
-            } else {
-                $mform->addElement('hidden','cohortid');
-                $mform->setType('cohortid', PARAM_INT);
-                $mform->setConstant('cohortid', '0');
+        $coursecontext = context_course::instance($COURSE->id);
+        if ($cohorts = cohort_get_available_cohorts($coursecontext, COHORT_WITH_ENROLLED_MEMBERS_ONLY, 0, 0)) {
+            $options = array(0 => get_string('anycohort', 'cohort'));
+            foreach ($cohorts as $c) {
+                $options[$c->id] = format_string($c->name, true, context::instance_by_id($c->contextid));
             }
+            $mform->addElement('select', 'cohortid', get_string('selectfromcohort', 'cohort'), $options);
+            $mform->setDefault('cohortid', '0');
         } else {
             $mform->addElement('hidden','cohortid');
             $mform->setType('cohortid', PARAM_INT);
@@ -144,6 +140,12 @@ class autogroup_form extends moodleform {
         $mform->addElement('checkbox', 'notingroup', get_string('notingroup', 'group'));
         $mform->disabledIf('notingroup', 'groupingid', 'neq', 0);
         $mform->disabledIf('notingroup', 'groupid', 'neq', 0);
+
+        if (has_capability('moodle/course:viewsuspendedusers', $coursecontext)) {
+            $mform->addElement('checkbox', 'includeonlyactiveenrol', get_string('includeonlyactiveenrol', 'group'), '');
+            $mform->addHelpButton('includeonlyactiveenrol', 'includeonlyactiveenrol', 'group');
+            $mform->setDefault('includeonlyactiveenrol', true);
+        }
 
         $mform->addElement('header', 'groupinghdr', get_string('grouping', 'group'));
 

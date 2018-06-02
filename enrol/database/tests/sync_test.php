@@ -54,14 +54,9 @@ class enrol_database_testcase extends advanced_testcase {
             set_config('dbhost', $CFG->dbhost.':'.$CFG->dboptions['dbport'], 'enrol_database');
         }
 
-        switch (get_class($DB)) {
-            case 'mssql_native_moodle_database':
-                set_config('dbtype', 'mssql_n', 'enrol_database');
-                set_config('dbsybasequoting', '1', 'enrol_database');
-                break;
+        switch ($DB->get_dbfamily()) {
 
-            case 'mariadb_native_moodle_database':
-            case 'mysqli_native_moodle_database':
+            case 'mysql':
                 set_config('dbtype', 'mysqli', 'enrol_database');
                 set_config('dbsetupsql', "SET NAMES 'UTF-8'", 'enrol_database');
                 set_config('dbsybasequoting', '0', 'enrol_database');
@@ -74,12 +69,12 @@ class enrol_database_testcase extends advanced_testcase {
                 }
                 break;
 
-            case 'oci_native_moodle_database':
+            case 'oracle':
                 set_config('dbtype', 'oci8po', 'enrol_database');
                 set_config('dbsybasequoting', '1', 'enrol_database');
                 break;
 
-            case 'pgsql_native_moodle_database':
+            case 'postgres':
                 set_config('dbtype', 'postgres7', 'enrol_database');
                 $setupsql = "SET NAMES 'UTF-8'";
                 if (!empty($CFG->dboptions['dbschema'])) {
@@ -100,7 +95,7 @@ class enrol_database_testcase extends advanced_testcase {
                 }
                 break;
 
-            case 'sqlsrv_native_moodle_database':
+            case 'mssql':
                 set_config('dbtype', 'mssqlnative', 'enrol_database');
                 set_config('dbsybasequoting', '1', 'enrol_database');
                 break;
@@ -731,6 +726,13 @@ class enrol_database_testcase extends advanced_testcase {
         $this->assertEquals(1, $DB->count_records('course', array('idnumber' => 'yy')));
         $this->assertEquals(1, $DB->count_records('course', array('shortname' => 'xx')));
 
+        // Check default number of sections matches with the created course sections.
+
+        $recordcourse1 = $DB->get_record('course', $course1);
+        $courseconfig = get_config('moodlecourse');
+        $numsections = $DB->count_records('course_sections', array('course' => $recordcourse1->id));
+        // To compare numsections we have to add topic 0 to default numsections.
+        $this->assertEquals(($courseconfig->numsections + 1), $numsections);
 
         // Test category mapping via idnumber.
 
@@ -759,8 +761,7 @@ class enrol_database_testcase extends advanced_testcase {
         $course8['category'] = $defcat->id;
         $record = $DB->get_record('course', $course8);
         $this->assertFalse(empty($record));
-        $courseformatoptions = course_get_format($record)->get_format_options();
-        $this->assertEquals($courseformatoptions['numsections'], 666);
+        $this->assertEquals(666, course_get_format($record)->get_last_section_number());
 
         // Test invalid category.
 

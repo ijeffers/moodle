@@ -69,6 +69,18 @@ define('BADGE_CRITERIA_TYPE_COURSESET', 5);
 define('BADGE_CRITERIA_TYPE_PROFILE', 6);
 
 /*
+ * Badge completion criteria type
+ * Criteria type constant, primarily for storing criteria type in the database.
+ */
+define('BADGE_CRITERIA_TYPE_BADGE', 7);
+
+/*
+ * Cohort criteria type
+ * Criteria type constant, primarily for storing criteria type in the database.
+ */
+define('BADGE_CRITERIA_TYPE_COHORT', 8);
+
+/*
  * Criteria type constant to class name mapping
  */
 global $BADGE_CRITERIA_TYPES;
@@ -79,7 +91,9 @@ $BADGE_CRITERIA_TYPES = array(
     BADGE_CRITERIA_TYPE_SOCIAL    => 'social',
     BADGE_CRITERIA_TYPE_COURSE    => 'course',
     BADGE_CRITERIA_TYPE_COURSESET => 'courseset',
-    BADGE_CRITERIA_TYPE_PROFILE   => 'profile'
+    BADGE_CRITERIA_TYPE_PROFILE   => 'profile',
+    BADGE_CRITERIA_TYPE_BADGE     => 'badge',
+    BADGE_CRITERIA_TYPE_COHORT    => 'cohort',
 );
 
 /**
@@ -88,9 +102,40 @@ $BADGE_CRITERIA_TYPES = array(
  */
 abstract class award_criteria {
 
+    /**
+     * ID of the criterion.
+     * @var integer
+     */
     public $id;
+
+    /**
+     * Aggregation method [BADGE_CRITERIA_AGGREGATION_ANY, BADGE_CRITERIA_AGGREGATION_ALL].
+     * @var integer
+     */
     public $method;
+
+    /**
+     * ID of a badge this criterion belongs to.
+     * @var integer
+     */
     public $badgeid;
+
+    /**
+     * Criterion HTML/plain text description.
+     * @var string
+     */
+    public $description;
+
+    /**
+     * Format of the criterion description.
+     * @var integer
+     */
+    public $descriptionformat;
+
+    /**
+     * Any additional parameters.
+     * @var array
+     */
     public $params = array();
 
     /**
@@ -102,6 +147,8 @@ abstract class award_criteria {
         $this->id = isset($params['id']) ? $params['id'] : 0;
         $this->method = isset($params['method']) ? $params['method'] : BADGE_CRITERIA_AGGREGATION_ANY;
         $this->badgeid = $params['badgeid'];
+        $this->description = isset($params['description']) ? $params['description'] : '';
+        $this->descriptionformat = isset($params['descriptionformat']) ? $params['descriptionformat'] : FORMAT_HTML;
         if (isset($params['id'])) {
             $this->params = $this->get_params($params['id']);
         }
@@ -163,7 +210,8 @@ abstract class award_criteria {
             $mform->addGroup($parameter, 'param_' . $prefix . $param['id'], '', array(' '), false);
         } else {
             $parameter[] =& $mform->createElement('advcheckbox', $prefix . $param['id'], '', $param['name'], null, array(0, $param['id']));
-            $parameter[] =& $mform->createElement('static', 'break_start_' . $param['id'], null, '<div style="margin-left: 3em;">');
+            $parameter[] =& $mform->createElement('static', 'break_start_' . $param['id'], null,
+                '<div class="ml-3 mt-1 w-100 align-items-center">');
 
             if (in_array('grade', $this->optional_params)) {
                 $parameter[] =& $mform->createElement('static', 'mgrade_' . $param['id'], null, get_string('mingrade', 'badges'));
@@ -220,10 +268,18 @@ abstract class award_criteria {
         }
         echo $OUTPUT->heading($this->get_title() . $OUTPUT->help_icon('criteria_' . $this->criteriatype, 'badges'), 3, 'main help');
 
+        if (!empty($this->description)) {
+            $badge = new badge($this->badgeid);
+            echo $OUTPUT->box(
+                format_text($this->description, $this->descriptionformat, array('context' => $badge->get_context())),
+                'criteria-description'
+                );
+        }
+
         if (!empty($this->params)) {
             if (count($this->params) > 1) {
                 echo $OUTPUT->box(get_string('criteria_descr_' . $this->criteriatype, 'badges',
-                        strtoupper($agg[$data->get_aggregation_method($this->criteriatype)])), array('clearfix'));
+                        core_text::strtoupper($agg[$data->get_aggregation_method($this->criteriatype)])), array('clearfix'));
             } else {
                 echo $OUTPUT->box(get_string('criteria_descr_single_' . $this->criteriatype , 'badges'), array('clearfix'));
             }
@@ -291,7 +347,7 @@ abstract class award_criteria {
      *
      */
     public function delete() {
-        global $DB;
+        global $DB, $PAGE;
 
         // Remove any records if it has already been met.
         $DB->delete_records('badge_criteria_met', array('critid' => $this->id));
@@ -301,27 +357,51 @@ abstract class award_criteria {
 
         // Finally remove criterion itself.
         $DB->delete_records('badge_criteria', array('id' => $this->id));
+
+        // Trigger event, badge criteria deleted.
+        $eventparams = array('objectid' => $this->id,
+            'context' => $PAGE->context,
+            'other' => array('badgeid' => $this->badgeid));
+        $event = \core\event\badge_criteria_deleted::create($eventparams);
+        $event->trigger();
     }
 
     /**
      * Saves intial criteria records with required parameters set up.
+     *
+     * @param array $params Values from the form or any other array.
      */
     public function save($params = array()) {
-        global $DB;
+        global $DB, $PAGE;
+
+        // Figure out criteria description.
+        // If it is coming from the form editor, it is an array(text, format).
+        $description = '';
+        $descriptionformat = FORMAT_HTML;
+        if (isset($params['description']['text'])) {
+            $description = $params['description']['text'];
+            $descriptionformat = $params['description']['format'];
+        } else if (isset($params['description'])) {
+            $description = $params['description'];
+        }
+
         $fordb = new stdClass();
         $fordb->criteriatype = $this->criteriatype;
-        $fordb->method = isset($params->agg) ? $params->agg : $params['agg'];
+        $fordb->method = isset($params['agg']) ? $params['agg'] : BADGE_CRITERIA_AGGREGATION_ALL;
         $fordb->badgeid = $this->badgeid;
+        $fordb->description = $description;
+        $fordb->descriptionformat = $descriptionformat;
         $t = $DB->start_delegated_transaction();
 
-        // Unset unnecessary parameters supplied with form.
-        if (isset($params->agg)) {
-            unset($params->agg);
-        } else {
-            unset($params['agg']);
-        }
-        unset($params->submitbutton);
-        $params = array_filter((array)$params);
+        // Pick only params that are required by this criterion.
+        // Filter out empty values first.
+        $params = array_filter($params);
+        // Find out which param matches optional and required ones.
+        $match = array_merge($this->optional_params, array($this->required_param));
+        $regex = implode('|', array_map(function($a) {
+            return $a . "_";
+        }, $match));
+        $requiredkeys = preg_grep('/^(' . $regex . ').*$/', array_keys($params));
 
         if ($this->id !== 0) {
             $cid = $this->id;
@@ -330,8 +410,15 @@ abstract class award_criteria {
             $fordb->id = $cid;
             $DB->update_record('badge_criteria', $fordb, true);
 
+            // Trigger event: badge_criteria_updated.
+            $eventparams = array('objectid' => $this->id,
+                'context' => $PAGE->context,
+                'other' => array('badgeid' => $this->badgeid));
+            $event = \core\event\badge_criteria_updated::create($eventparams);
+            $event->trigger();
+
             $existing = $DB->get_fieldset_select('badge_criteria_param', 'name', 'critid = ?', array($cid));
-            $todelete = array_diff($existing, array_keys($params));
+            $todelete = array_diff($existing, $requiredkeys);
 
             if (!empty($todelete)) {
                 // A workaround to add some disabled elements that are still being submitted from the form.
@@ -349,32 +436,38 @@ abstract class award_criteria {
                 $DB->delete_records_select('badge_criteria_param', 'critid = :critid AND name ' . $sql, $sqlparams);
             }
 
-            foreach ($params as $key => $value) {
+            foreach ($requiredkeys as $key) {
                 if (in_array($key, $existing)) {
                     $updp = $DB->get_record('badge_criteria_param', array('name' => $key, 'critid' => $cid));
-                    $updp->value = $value;
+                    $updp->value = $params[$key];
                     $DB->update_record('badge_criteria_param', $updp, true);
                 } else {
                     $newp = new stdClass();
                     $newp->critid = $cid;
                     $newp->name = $key;
-                    $newp->value = $value;
+                    $newp->value = $params[$key];
                     $DB->insert_record('badge_criteria_param', $newp);
                 }
             }
         } else {
             $cid = $DB->insert_record('badge_criteria', $fordb, true);
             if ($cid) {
-                foreach ($params as $key => $value) {
+                foreach ($requiredkeys as $key) {
                     $newp = new stdClass();
                     $newp->critid = $cid;
                     $newp->name = $key;
-                    $newp->value = $value;
+                    $newp->value = $params[$key];
                     $DB->insert_record('badge_criteria_param', $newp, false, true);
                 }
             }
-         }
-         $t->allow_commit();
+            // Trigger event: badge_criteria_created.
+            $eventparams = array('objectid' => $this->id,
+                'context' => $PAGE->context,
+                'other' => array('badgeid' => $this->badgeid));
+            $event = \core\event\badge_criteria_created::create($eventparams);
+            $event->trigger();
+        }
+        $t->allow_commit();
     }
 
     /**
@@ -387,6 +480,8 @@ abstract class award_criteria {
         $fordb->criteriatype = $this->criteriatype;
         $fordb->method = $this->method;
         $fordb->badgeid = $newbadgeid;
+        $fordb->description = $this->description;
+        $fordb->descriptionformat = $this->descriptionformat;
         if (($newcrit = $DB->insert_record('badge_criteria', $fordb, true)) && isset($this->params)) {
             foreach ($this->params as $k => $param) {
                 foreach ($param as $key => $value) {

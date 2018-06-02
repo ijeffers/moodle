@@ -48,7 +48,14 @@ class comment {
     private $courseid;
     /** @var stdClass course module object, only be used to help find pluginname automatically */
     private $cm;
-    /** @var string The component that this comment is for. It is STRONGLY recommended to set this. */
+    /**
+     * The component that this comment is for.
+     *
+     * It is STRONGLY recommended to set this.
+     * Added as a database field in 2.9, old comments will have a null component.
+     *
+     * @var string
+     */
     private $component;
     /** @var string This is calculated by normalising the component */
     private $pluginname;
@@ -70,6 +77,12 @@ class comment {
     protected $displaycancel = false;
     /** @var int The number of comments associated with this comments params */
     protected $totalcommentcount = null;
+
+    /**
+     * Set to true to remove the col attribute from the textarea making it full width.
+     * @var bool
+     */
+    protected $fullwidth = false;
 
     /** @var bool Use non-javascript UI */
     private static $nonjs = false;
@@ -140,7 +153,11 @@ class comment {
         } else if (!empty($options->courseid)) {
             $this->courseid = $options->courseid;
         } else {
-            $this->courseid = SITEID;
+            if ($coursecontext = $this->context->get_course_context(false)) {
+                $this->courseid = $coursecontext->instanceid;
+            } else {
+                $this->courseid = SITEID;
+            }
         }
 
         // setup coursemodule
@@ -203,7 +220,7 @@ class comment {
         // load template
         $this->template = html_writer::start_tag('div', array('class' => 'comment-message'));
 
-        $this->template .= html_writer::start_tag('div', array('class' => 'comment-message-meta'));
+        $this->template .= html_writer::start_tag('div', array('class' => 'comment-message-meta m-r-3'));
 
         $this->template .= html_writer::tag('span', '___picture___', array('class' => 'picture'));
         $this->template .= html_writer::tag('span', '___name___', array('class' => 'user')) . ' - ';
@@ -235,15 +252,21 @@ class comment {
         }
         // setup variables for non-js interface
         self::$nonjs = optional_param('nonjscomment', '', PARAM_ALPHANUM);
-        self::$comment_itemid  = optional_param('comment_itemid',  '', PARAM_INT);
+        self::$comment_itemid = optional_param('comment_itemid',  '', PARAM_INT);
+        self::$comment_component = optional_param('comment_component', '', PARAM_COMPONENT);
         self::$comment_context = optional_param('comment_context', '', PARAM_INT);
-        self::$comment_page    = optional_param('comment_page',    '', PARAM_INT);
-        self::$comment_area    = optional_param('comment_area',    '', PARAM_AREA);
+        self::$comment_page = optional_param('comment_page',    '', PARAM_INT);
+        self::$comment_area = optional_param('comment_area',    '', PARAM_AREA);
 
-        $page->requires->string_for_js('addcomment', 'moodle');
-        $page->requires->string_for_js('deletecomment', 'moodle');
-        $page->requires->string_for_js('comments', 'moodle');
-        $page->requires->string_for_js('commentsrequirelogin', 'moodle');
+        $page->requires->strings_for_js(array(
+                'addcomment',
+                'comments',
+                'commentscount',
+                'commentsrequirelogin',
+                'deletecommentbyon'
+            ),
+            'moodle'
+        );
     }
 
     /**
@@ -253,6 +276,7 @@ class comment {
      * invalidates permission checks.
      * A coding_error is now thrown if code attempts to change the component.
      *
+     * @throws coding_exception if you try to change the component after it has been set.
      * @param string $component
      */
     public function set_component($component) {
@@ -314,6 +338,7 @@ class comment {
             'nonjscomment'    => true,
             'comment_itemid'  => $this->itemid,
             'comment_context' => $this->context->id,
+            'comment_component' => $this->get_component(),
             'comment_area'    => $this->commentarea,
         ));
         $link->remove_params(array('comment_page'));
@@ -435,8 +460,14 @@ class comment {
                 } else {
                     $collapsedimage= 't/collapsed';
                 }
-                $html .= html_writer::start_tag('a', array('class' => 'comment-link', 'id' => 'comment-link-'.$this->cid, 'href' => '#'));
-                $html .= html_writer::empty_tag('img', array('id' => 'comment-img-'.$this->cid, 'src' => $OUTPUT->pix_url($collapsedimage), 'alt' => $this->linktext, 'title' => $this->linktext));
+                $html .= html_writer::start_tag('a', array(
+                    'class' => 'comment-link',
+                    'id' => 'comment-link-'.$this->cid,
+                    'href' => '#',
+                    'role' => 'button',
+                    'aria-expanded' => 'false')
+                );
+                $html .= $OUTPUT->pix_icon($collapsedimage, $this->linktext);
                 $html .= html_writer::tag('span', $this->linktext.' '.$countstring, array('id' => 'comment-link-text-'.$this->cid));
                 $html .= html_writer::end_tag('a');
             }
@@ -459,9 +490,20 @@ class comment {
 
             if ($this->can_post()) {
                 // print posting textarea
+                $textareaattrs = array(
+                    'name' => 'content',
+                    'rows' => 2,
+                    'id' => 'dlg-content-'.$this->cid
+                );
+                if (!$this->fullwidth) {
+                    $textareaattrs['cols'] = '20';
+                } else {
+                    $textareaattrs['class'] = 'fullwidth';
+                }
+
                 $html .= html_writer::start_tag('div', array('class' => 'comment-area'));
                 $html .= html_writer::start_tag('div', array('class' => 'db'));
-                $html .= html_writer::tag('textarea', '', array('name' => 'content', 'rows' => 2, 'cols' => 20, 'id' => 'dlg-content-'.$this->cid));
+                $html .= html_writer::tag('textarea', '', $textareaattrs);
                 $html .= html_writer::end_tag('div'); // .db
 
                 $html .= html_writer::start_tag('div', array('class' => 'fd', 'id' => 'comment-action-'.$this->cid));
@@ -508,10 +550,19 @@ class comment {
         $perpage = (!empty($CFG->commentsperpage))?$CFG->commentsperpage:15;
         $start = $page * $perpage;
         $ufields = user_picture::fields('u');
+
+        list($componentwhere, $component) = $this->get_component_select_sql('c');
+        if ($component) {
+            $params['component'] = $component;
+        }
+
         $sql = "SELECT $ufields, c.id AS cid, c.content AS ccontent, c.format AS cformat, c.timecreated AS ctimecreated
                   FROM {comments} c
                   JOIN {user} u ON u.id = c.userid
-                 WHERE c.contextid = :contextid AND c.commentarea = :commentarea AND c.itemid = :itemid
+                 WHERE c.contextid = :contextid AND
+                       c.commentarea = :commentarea AND
+                       c.itemid = :itemid AND
+                       $componentwhere
               ORDER BY c.timecreated DESC";
         $params['contextid'] = $this->contextid;
         $params['commentarea'] = $this->commentarea;
@@ -552,6 +603,25 @@ class comment {
     }
 
     /**
+     * Returns an SQL fragment and param for selecting on component.
+     * @param string $alias
+     * @return array
+     */
+    protected function get_component_select_sql($alias = '') {
+        $component = $this->get_component();
+        if ($alias) {
+            $alias = $alias.'.';
+        }
+        if (empty($component)) {
+            $componentwhere = "{$alias}component IS NULL";
+            $component = null;
+        } else {
+            $componentwhere = "({$alias}component IS NULL OR {$alias}component = :component)";
+        }
+        return array($componentwhere, $component);
+    }
+
+    /**
      * Returns the number of comments associated with the details of this object
      *
      * @global moodle_database $DB
@@ -560,7 +630,18 @@ class comment {
     public function count() {
         global $DB;
         if ($this->totalcommentcount === null) {
-            $this->totalcommentcount = $DB->count_records('comments', array('itemid' => $this->itemid, 'commentarea' => $this->commentarea, 'contextid' => $this->context->id));
+            list($where, $component) = $this->get_component_select_sql();
+            $where .= ' AND itemid = :itemid AND commentarea = :commentarea AND contextid = :contextid';
+            $params = array(
+                'itemid' => $this->itemid,
+                'commentarea' => $this->commentarea,
+                'contextid' => $this->context->id,
+            );
+            if ($component) {
+                $params['component'] = $component;
+            }
+
+            $this->totalcommentcount = $DB->count_records_select('comments', $where, $params);
         }
         return $this->totalcommentcount;
     }
@@ -619,6 +700,7 @@ class comment {
         $newcmt->contextid    = $this->contextid;
         $newcmt->commentarea  = $this->commentarea;
         $newcmt->itemid       = $this->itemid;
+        $newcmt->component    = !empty($this->component) ? $this->component : null;
         $newcmt->content      = $content;
         $newcmt->format       = $format;
         $newcmt->userid       = $USER->id;
@@ -630,11 +712,11 @@ class comment {
         $cmt_id = $DB->insert_record('comments', $newcmt);
         if (!empty($cmt_id)) {
             $newcmt->id = $cmt_id;
-            $newcmt->strftimeformat = get_string('strftimerecent', 'langconfig');
+            $newcmt->strftimeformat = get_string('strftimerecentfull', 'langconfig');
             $newcmt->fullname = fullname($USER);
             $url = new moodle_url('/user/view.php', array('id' => $USER->id, 'course' => $this->courseid));
             $newcmt->profileurl = $url->out();
-            $newcmt->content = format_text($newcmt->content, $format, array('overflowdiv'=>true));
+            $newcmt->content = format_text($newcmt->content, $newcmt->format, array('overflowdiv'=>true));
             $newcmt->avatar = $OUTPUT->user_picture($USER, array('size'=>16));
 
             $commentlist = array($newcmt);
@@ -763,10 +845,11 @@ class comment {
             return '';
         }
 
-        $html = '';
         if (!(self::$comment_itemid == $this->itemid &&
             self::$comment_context == $this->context->id &&
-            self::$comment_area == $this->commentarea)) {
+            self::$comment_area == $this->commentarea &&
+            self::$comment_component == $this->component
+        )) {
             $page = 0;
         }
         $comments = $this->get_comments($page);
@@ -832,8 +915,11 @@ class comment {
         $replacements = array();
 
         if (!empty($cmt->delete) && empty($nonjs)) {
+            $strdelete = get_string('deletecommentbyon', 'moodle', (object)['user' => $cmt->fullname, 'time' => $cmt->time]);
             $deletelink  = html_writer::start_tag('div', array('class'=>'comment-delete'));
-            $deletelink .= html_writer::start_tag('a', array('href' => '#', 'id' => 'comment-delete-'.$this->cid.'-'.$cmt->id));
+            $deletelink .= html_writer::start_tag('a', array('href' => '#', 'id' => 'comment-delete-'.$this->cid.'-'.$cmt->id,
+                                                             'title' => $strdelete));
+
             $deletelink .= $OUTPUT->pix_icon('t/delete', get_string('delete'));
             $deletelink .= html_writer::end_tag('a');
             $deletelink .= html_writer::end_tag('div');
@@ -896,11 +982,22 @@ class comment {
     }
 
     /**
-     * Returns the component associated with the comment
+     * Returns the component associated with the comment.
+     *
+     * @return string
+     */
+    public function get_component() {
+        return $this->component;
+    }
+
+    /**
+     * Do not call! I am a deprecated method because of the typo in my name.
+     * @deprecated since 2.9
+     * @see comment::get_component()
      * @return string
      */
     public function get_compontent() {
-        return $this->component;
+        return $this->get_component();
     }
 
     /**
@@ -945,6 +1042,97 @@ class comment {
     public function get_commentarea() {
         return $this->commentarea;
     }
+
+    /**
+     * Make the comments textarea fullwidth.
+     *
+     * @since 2.8.1 + 2.7.4
+     * @param bool $fullwidth
+     */
+    public function set_fullwidth($fullwidth = true) {
+        $this->fullwidth = (bool)$fullwidth;
+    }
+
+    /**
+     * Return the template.
+     *
+     * @since 3.1
+     * @return string
+     */
+    public function get_template() {
+        return $this->template;
+    }
+
+    /**
+     * Return the cid.
+     *
+     * @since 3.1
+     * @return string
+     */
+    public function get_cid() {
+        return $this->cid;
+    }
+
+    /**
+     * Return the link text.
+     *
+     * @since 3.1
+     * @return string
+     */
+    public function get_linktext() {
+        return $this->linktext;
+    }
+
+    /**
+     * Return no toggle.
+     *
+     * @since 3.1
+     * @return bool
+     */
+    public function get_notoggle() {
+        return $this->notoggle;
+    }
+
+    /**
+     * Return display total count.
+     *
+     * @since 3.1
+     * @return bool
+     */
+    public function get_displaytotalcount() {
+        return $this->displaytotalcount;
+    }
+
+    /**
+     * Return display cancel.
+     *
+     * @since 3.1
+     * @return bool
+     */
+    public function get_displaycancel() {
+        return $this->displaycancel;
+    }
+
+    /**
+     * Return fullwidth.
+     *
+     * @since 3.1
+     * @return bool
+     */
+    public function get_fullwidth() {
+        return $this->fullwidth;
+    }
+
+    /**
+     * Return autostart.
+     *
+     * @since 3.1
+     * @return bool
+     */
+    public function get_autostart() {
+        return $this->autostart;
+    }
+
 }
 
 /**

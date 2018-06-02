@@ -13,7 +13,7 @@ Feature: Course category management interface performs as expected
     And I go to the courses management page
     And I should see "Course and category management" in the "h2" "css_element"
     And I should see "Course categories" in the ".view-mode-selector" "css_element"
-    And I should see "Course categories" in the "h3" "css_element"
+    And I should see "Course categories" in the "#page-content" "css_element"
     And I should see the "Course categories and courses" management page
 
   @javascript
@@ -35,18 +35,21 @@ Feature: Course category management interface performs as expected
     And I should not see "Course categories" in the ".view-mode-selector .menu" "css_element"
     And I should not see "Courses" in the ".view-mode-selector .menu" "css_element"
     When I click on "Course categories" "link" in the ".view-mode-selector" "css_element"
+    And I start watching to see if a new page loads
     Then I should see "Course categories and courses" in the ".view-mode-selector .menu" "css_element"
     And I should see "Course categories" in the ".view-mode-selector .menu" "css_element"
     And I should see "Courses" in the ".view-mode-selector .menu" "css_element"
     And I click on "Course categories and courses" "link" in the ".view-mode-selector .menu" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Course categories" in the "#category-listing h3" "css_element"
     And I should see "Miscellaneous" in the "#course-listing h3" "css_element"
     And I should see "Cat 1" in the "#category-listing" "css_element"
     And I should see "No courses in this category" in the "#course-listing" "css_element"
     And I click on category "Cat 1" in the management interface
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Course categories" in the "#category-listing h3" "css_element"
     And I should see "Cat 1" in the "#course-listing h3" "css_element"
@@ -55,12 +58,13 @@ Feature: Course category management interface performs as expected
     When I click on "Course categories" "link" in the ".view-mode-selector" "css_element"
     Then I should see "Courses" in the ".view-mode-selector .menu" "css_element"
     And I click on "Courses" "link" in the ".view-mode-selector .menu" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Courses" management page
     And I should see "Cat 1" in the "#course-listing h3" "css_element"
     And I should see "Course 1" in the "#course-listing" "css_element"
     And I click on course "Course 1" in the management interface
-    # Redirect.
+    And a new page should have loaded since I started watching
     And I should see the "Courses" management page with a course selected
     And I should see "Cat 1" in the "#course-listing h3" "css_element"
     And I should see "Course 1" in the "#course-listing" "css_element"
@@ -95,47 +99,47 @@ Feature: Course category management interface performs as expected
     And I log in as "admin"
     And I go to the courses management page
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click on "Cat 1" "link"
     # Redirect.
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click on "Cat 1-1" "link"
     # Redirect.
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click on "Cat 2" "link"
     # Redirect.
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
 
   # This is similar to the above scenario except here we are going to use AJAX
   # to load the categories.
@@ -164,75 +168,76 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT1" in the management interface
-    # AJAX action - no redirect.
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And a new page should not have loaded since I started watching
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT3" in the management interface
-    # AJAX action - no redirect.
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And a new page should not have loaded since I started watching
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT2" in the management interface
-    # AJAX action - no redirect.
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And a new page should not have loaded since I started watching
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT7" in the management interface
-    # AJAX action - no redirect.
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And a new page should not have loaded since I started watching
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT1" in the management interface
-    # AJAX action - no redirect.
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And a new page should not have loaded since I started watching
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT1" in the management interface
-    # AJAX action - no redirect.
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
+    And a new page should not have loaded since I started watching
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
 
   @javascript
   Scenario Outline: Top level categories are displayed correctly when resorted
@@ -244,11 +249,12 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I set the field "menuselectsortby" to "All categories"
     And I set the field "menuresortcategoriesby" to <sortby>
     And I press "Sort"
-    # Redirect.
+    And a new page should have loaded since I started watching
     And I should see the "Course categories and courses" management page
     And I should see category listing <cat1> before <cat2>
     And I should see category listing <cat2> before <cat3>
@@ -271,12 +277,14 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on "Master cat" category in the management category listing
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on <sortby> action for "Master cat" in management category listing
-    # Redirect.
+    And a new page should have loaded since I started watching
     And I should see the "Course categories and courses" management page
     And I should see category listing <cat1> before <cat2>
     And I should see category listing <cat2> before <cat3>
@@ -301,9 +309,11 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on "Cat 1" "link"
-  # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on "Sort courses" "link"
     And I should see "Sort by Course full name ascending" in the ".course-listing-actions" "css_element"
@@ -315,7 +325,7 @@ Feature: Course category management interface performs as expected
     And I should see "Sort by Course time created ascending" in the ".course-listing-actions" "css_element"
     And I should see "Sort by Course time created descending" in the ".course-listing-actions" "css_element"
     And I click on <sortby> "link" in the ".course-listing-actions" "css_element"
-  # Redirect.
+    And a new page should have loaded since I started watching
     And I should see the "Course categories and courses" management page
     And I should see course listing <course1> before <course2>
     And I should see course listing <course2> before <course3>
@@ -353,13 +363,16 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on "Cat 1" "link"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on "Sort courses" "link"
     And I click on "Sort by Course ID number ascending" "link" in the ".course-listing-actions" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see "Per page: 20" in the ".course-listing-actions" "css_element"
     And I should see course listing "Course 1" before "Course 2"
     And I should see course listing "Course 2" before "Course 3"
@@ -379,7 +392,8 @@ Feature: Course category management interface performs as expected
     And I should see "20" in the ".courses-per-page" "css_element"
     And I should see "All" in the ".courses-per-page" "css_element"
     And I click on "5" "link" in the ".courses-per-page" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should see course listing "Course 1" before "Course 2"
@@ -403,7 +417,8 @@ Feature: Course category management interface performs as expected
     And I should see "Next" in the "#course-listing .listing-pagination" "css_element"
     And I should see "Last" in the "#course-listing .listing-pagination" "css_element"
     And I click on "2" "link" in the "#course-listing .listing-pagination" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should see "Course 10" in the "#course-listing" "css_element"
@@ -427,7 +442,8 @@ Feature: Course category management interface performs as expected
     And I should see "Next" in the "#course-listing .listing-pagination" "css_element"
     And I should see "Last" in the "#course-listing .listing-pagination" "css_element"
     And I click on "Next" "link" in the "#course-listing .listing-pagination" "css_element"
-    # Redirect. Test next link.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should see "Course 11"
@@ -451,7 +467,8 @@ Feature: Course category management interface performs as expected
     And I should not see "Next" in the "#course-listing .listing-pagination" "css_element"
     And I should not see "Last" in the "#course-listing .listing-pagination" "css_element"
     And I click on "First" "link" in the "#course-listing .listing-pagination" "css_element"
-    # Redirect. Test first link.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should see course listing "Course 1" before "Course 2"
@@ -475,7 +492,8 @@ Feature: Course category management interface performs as expected
     And I should see "Next" in the "#course-listing .listing-pagination" "css_element"
     And I should see "Last" in the "#course-listing .listing-pagination" "css_element"
     And I click on "Last" "link" in the "#course-listing .listing-pagination" "css_element"
-    # Redirect. Test last link.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should see "Course 11" in the "#course-listing" "css_element"
@@ -499,7 +517,7 @@ Feature: Course category management interface performs as expected
     And I should not see "Next" in the "#course-listing .listing-pagination" "css_element"
     And I should not see "Last" in the "#course-listing .listing-pagination" "css_element"
     And I click on "Prev" "link" in the "#course-listing .listing-pagination" "css_element"
-    # Redirect. Test prev link.
+    And a new page should have loaded since I started watching
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should see "Course 10" in the "#course-listing" "css_element"
@@ -601,13 +619,16 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on "Cat 1" "link"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I click on "Sort courses" "link"
     And I click on "Sort by Course ID number ascending" "link" in the ".course-listing-actions" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 20" in the ".course-listing-actions" "css_element"
     And I should see course listing "Course 1" before "Course 2"
@@ -616,7 +637,8 @@ Feature: Course category management interface performs as expected
     And I should see "Showing courses 1 to 20 of 32 courses"
     And I click on "Per page: 20" "link" in the ".course-listing-actions" "css_element"
     And I click on "100" "link" in the ".courses-per-page" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 100" in the ".course-listing-actions" "css_element"
     And I should see course listing "Course 1" before "Course 2"
@@ -626,7 +648,8 @@ Feature: Course category management interface performs as expected
     And "#course-listing .listing-pagination" "css_element" should not exist
     And I click on "Per page: 100" "link" in the ".course-listing-actions" "css_element"
     And I click on "5" "link" in the ".courses-per-page" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should see course listing "Course 1" before "Course 2"
@@ -645,7 +668,8 @@ Feature: Course category management interface performs as expected
     And I should see "Next" in the "#course-listing .listing-pagination" "css_element"
     And I should see "Last" in the "#course-listing .listing-pagination" "css_element"
     And I click on "Last" "link" in the "#course-listing .listing-pagination" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should not see "Course 30"
@@ -663,7 +687,7 @@ Feature: Course category management interface performs as expected
     And I should not see "Next" in the "#course-listing .listing-pagination" "css_element"
     And I should not see "Last" in the "#course-listing .listing-pagination" "css_element"
     And I click on "4" "link" in the "#course-listing .listing-pagination" "css_element"
-    # Redirect.
+    And a new page should have loaded since I started watching
     And I should see the "Course categories and courses" management page
     And I should see "Per page: 5" in the ".course-listing-actions" "css_element"
     And I should not see "Course 15"
@@ -720,51 +744,53 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT2" in the management interface
-    # AJAX action - no redirect.
+    And a new page should not have loaded since I started watching
     And I click to expand category "CAT7" in the management interface
-    # AJAX action - no redirect.
+    And a new page should not have loaded since I started watching
     And I click to expand category "CAT9" in the management interface
-    # AJAX action - no redirect.
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-2-1" in the "#course-category-listings ul.ml" "css_element"
+    And a new page should not have loaded since I started watching
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-2-1" in the "#course-category-listings ul" "css_element"
     And I click on "Cat 1" category in the management category listing
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-2-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-2-1" in the "#course-category-listings ul" "css_element"
     And I click on "resortbyidnumber" action for "Cat 1" in management category listing
-    # Redirect.
+    And a new page should have loaded since I started watching
     And I should see the "Course categories and courses" management page
-    And I should see "Cat 1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-2" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat 2-1-1-1" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat 2-1-2-1" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat 1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 1-2" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-2" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat 2-1-1-1" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat 2-1-2-1" in the "#course-category-listings ul" "css_element"
 
   @javascript
   Scenario: Test category expansion after deletion
@@ -778,31 +804,34 @@ Feature: Course category management interface performs as expected
 
     And I log in as "admin"
     And I go to the courses management page
+    And I start watching to see if a new page loads
     And I should see the "Course categories and courses" management page
-    And I should see "Cat A (1)" in the "#course-category-listings ul.ml" "css_element"
-    And I should see "Cat B (2)" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat C (1-1)" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat D (2-1)" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat E (2-1-1)" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat A (1)" in the "#course-category-listings ul" "css_element"
+    And I should see "Cat B (2)" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat C (1-1)" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat D (2-1)" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat E (2-1-1)" in the "#course-category-listings ul" "css_element"
     And I click to expand category "CAT1" in the management interface
-    And I should see "Cat C (1-1)" in the "#course-category-listings ul.ml" "css_element"
-    # AJAX action - no redirect.
+    And I should see "Cat C (1-1)" in the "#course-category-listings ul" "css_element"
+    And a new page should not have loaded since I started watching
     And I click to expand category "CAT2" in the management interface
-    And I should see "Cat D (2-1)" in the "#course-category-listings ul.ml" "css_element"
-    # AJAX action - no redirect.
+    And I should see "Cat D (2-1)" in the "#course-category-listings ul" "css_element"
+    And a new page should not have loaded since I started watching
     And I click to expand category "CAT4" in the management interface
-    And I should see "Cat E (2-1-1)" in the "#course-category-listings ul.ml" "css_element"
-    # AJAX action - no redirect.
+    And I should see "Cat E (2-1-1)" in the "#course-category-listings ul" "css_element"
+    And a new page should not have loaded since I started watching
     And I click on "delete" action for "Cat B (2)" in management category listing
-    # Redirect.
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see "Delete category: Cat B (2)"
     And I should see "Contents of Cat B (2)"
     And I press "Delete"
-    # Redirect
+    And a new page should have loaded since I started watching
+    And I start watching to see if a new page loads
     And I should see "Delete category: Cat B (2)"
     And I should see "Deleted course category Cat B (2)"
     And I press "Continue"
-    # Redirect.
+    And a new page should have loaded since I started watching
     And I should see the "Course categories and courses" management page
-    And I should see "Cat A (1)" in the "#course-category-listings ul.ml" "css_element"
-    And I should not see "Cat B (2)" in the "#course-category-listings ul.ml" "css_element"
+    And I should see "Cat A (1)" in the "#course-category-listings ul" "css_element"
+    And I should not see "Cat B (2)" in the "#course-category-listings ul" "css_element"

@@ -37,6 +37,10 @@ class tool_generator_course_backend extends tool_generator_backend {
      */
     private static $paramsections = array(1, 10, 100, 500, 1000, 2000);
     /**
+     * @var array Number of assignments in course
+     */
+    private static $paramassignments = array(1, 10, 100, 500, 1000, 2000);
+    /**
      * @var array Number of Page activities in course
      */
     private static $parampages = array(1, 50, 200, 1000, 5000, 10000);
@@ -80,6 +84,21 @@ class tool_generator_course_backend extends tool_generator_backend {
     private $shortname;
 
     /**
+     * @var string Course fullname.
+     */
+    private $fullname = "";
+
+    /**
+     * @var string Course summary.
+     */
+    private $summary = "";
+
+    /**
+     * @var string Course summary format, defaults to FORMAT_HTML.
+     */
+    private $summaryformat = FORMAT_HTML;
+
+    /**
      * @var testing_data_generator Data generator
      */
     protected $generator;
@@ -103,10 +122,37 @@ class tool_generator_course_backend extends tool_generator_backend {
      * @param int|bool $filesizelimit The max number of bytes for a generated file
      * @param bool $progress True if progress information should be displayed
      */
-    public function __construct($shortname, $size, $fixeddataset = false, $filesizelimit = false, $progress = true) {
+    public function __construct(
+        $shortname,
+        $size,
+        $fixeddataset = false,
+        $filesizelimit = false,
+        $progress = true,
+        $fullname = null,
+        $summary = null,
+        $summaryformat = FORMAT_HTML) {
 
         // Set parameters.
         $this->shortname = $shortname;
+
+        // We can't allow fullname to be set to an empty string.
+        if (empty($fullname)) {
+            $this->fullname = get_string(
+                'fullname',
+                'tool_generator',
+                array(
+                    'size' => get_string('shortsize_' . $size, 'tool_generator')
+                )
+            );
+        } else {
+            $this->fullname = $fullname;
+        }
+
+        // Summary, on the other hand, should be empty-able.
+        if (!is_null($summary)) {
+            $this->summary = $summary;
+            $this->summaryformat = $summaryformat;
+        }
 
         parent::__construct($size, $fixeddataset, $filesizelimit, $progress);
     }
@@ -170,18 +216,19 @@ class tool_generator_course_backend extends tool_generator_backend {
 
         $entirestart = microtime(true);
 
-        // Start transaction.
-        $transaction = $DB->start_delegated_transaction();
-
         // Get generator.
         $this->generator = phpunit_util::get_data_generator();
 
         // Make course.
         $this->course = $this->create_course();
-        $this->create_users();
+
+        $this->create_assignments();
         $this->create_pages();
         $this->create_small_files();
         $this->create_big_files();
+
+        // Create users as late as possible to reduce regarding in the gradebook.
+        $this->create_users();
         $this->create_forum();
 
         // Log total time.
@@ -191,8 +238,6 @@ class tool_generator_course_backend extends tool_generator_backend {
             echo html_writer::end_tag('ul');
         }
 
-        // Commit transaction and finish.
-        $transaction->allow_commit();
         return $this->course->id;
     }
 
@@ -203,10 +248,17 @@ class tool_generator_course_backend extends tool_generator_backend {
      */
     private function create_course() {
         $this->log('createcourse', $this->shortname);
-        $courserecord = array('shortname' => $this->shortname,
-                'fullname' => get_string('fullname', 'tool_generator',
-                    array('size' => get_string('shortsize_' . $this->size, 'tool_generator'))),
-                'numsections' => self::$paramsections[$this->size]);
+        $courserecord = array(
+            'shortname' => $this->shortname,
+            'fullname' => $this->fullname,
+            'numsections' => self::$paramsections[$this->size],
+            'startdate' => usergetmidnight(time())
+        );
+        if (strlen($this->summary) > 0) {
+            $courserecord['summary'] = $this->summary;
+            $courserecord['summary_format'] = $this->summaryformat;
+        }
+
         return $this->generator->create_course($courserecord, array('createsections' => true));
     }
 
@@ -303,8 +355,7 @@ class tool_generator_course_backend extends tool_generator_backend {
             $username = 'tool_generator_' . $textnumber;
 
             // Create user account.
-            $record = array('firstname' => get_string('firstname', 'tool_generator'),
-                    'lastname' => $number, 'username' => $username);
+            $record = array('username' => $username, 'idnumber' => $number);
 
             // We add a user password if it has been specified.
             if (!empty($CFG->tool_generator_users_password)) {
@@ -315,6 +366,26 @@ class tool_generator_course_backend extends tool_generator_backend {
             $this->userids[$number] = (int)$user->id;
             $this->dot($done, $count);
         }
+        $this->end_log();
+    }
+
+    /**
+     * Creates a number of Assignment activities.
+     */
+    private function create_assignments() {
+        // Set up generator.
+        $assigngenerator = $this->generator->get_plugin_generator('mod_assign');
+
+        // Create assignments.
+        $number = self::$paramassignments[$this->size];
+        $this->log('createassignments', $number, true);
+        for ($i = 0; $i < $number; $i++) {
+            $record = array('course' => $this->course);
+            $options = array('section' => $this->get_target_section());
+            $assigngenerator->create_instance($record, $options);
+            $this->dot($i, $number);
+        }
+
         $this->end_log();
     }
 
@@ -362,7 +433,7 @@ class tool_generator_course_backend extends tool_generator_backend {
 
             // Generate random binary data (different for each file so it
             // doesn't compress unrealistically).
-            $data = self::get_random_binary($this->limit_filesize(self::$paramsmallfilesize[$this->size]));
+            $data = random_bytes_emulate($this->limit_filesize(self::$paramsmallfilesize[$this->size]));
 
             $fs->create_file_from_string($filerecord, $data);
             $this->dot($i, $count);
@@ -372,32 +443,9 @@ class tool_generator_course_backend extends tool_generator_backend {
     }
 
     /**
-     * Creates a string of random binary data. The start of the string includes
-     * the current time, in an attempt to avoid large-scale repetition.
-     *
-     * @param int $length Number of bytes
-     * @return Random data
-     */
-    private static function get_random_binary($length) {
-
-        $data = microtime(true);
-        if (strlen($data) > $length) {
-            // Use last digits of data.
-            return substr($data, -$length);
-        }
-        $length -= strlen($data);
-        for ($j = 0; $j < $length; $j++) {
-            $data .= chr(rand(1, 255));
-        }
-        return $data;
-    }
-
-    /**
      * Creates a number of resource activities with one big file each.
      */
     private function create_big_files() {
-        global $CFG;
-
         // Work out how many files and how many blocks to use (up to 64KB).
         $count = self::$parambigfilecount[$this->size];
         $filesize = $this->limit_filesize(self::$parambigfilesize[$this->size]);
@@ -426,7 +474,7 @@ class tool_generator_course_backend extends tool_generator_backend {
                 throw new coding_exception('Failed to open temporary file');
             }
             for ($j = 0; $j < $blocks; $j++) {
-                $data = self::get_random_binary($blocksize);
+                $data = random_bytes_emulate($blocksize);
                 fwrite($handle, $data);
                 $this->dot($i * $blocks + $j, $count * $blocks);
             }

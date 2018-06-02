@@ -132,7 +132,7 @@ if ($courseid == SITEID) {
     $PAGE->set_heading($course->fullname.': '.$fullname);
 }
 echo $OUTPUT->header();
-echo $OUTPUT->heading($title, 3);
+echo $OUTPUT->heading($title);
 echo $OUTPUT->box_start('generalbox boxaligncenter boxwidthnormal');
 
 // Display them.
@@ -193,10 +193,8 @@ function print_report_tree($contextid, $contexts, $systemcontext, $fullname, $al
                 $strgoto = get_string('gotoassignroles', 'core_role', $a);
                 $strcheck = get_string('checkuserspermissionshere', 'core_role', $a);
             }
-            echo ' <a title="' . $strgoto . '" href="' . $raurl . '"><img class="iconsmall" src="' .
-                    $OUTPUT->pix_url('t/edit') . '" alt="' . $stredit . '" /></a> ';
-            echo ' <a title="' . $strcheck . '" href="' . $churl . '"><img class="iconsmall" src="' .
-                    $OUTPUT->pix_url('t/preview') . '" alt="' . $strcheckpermissions . '" /></a> ';
+            echo ' <a title="' . $strgoto . '" href="' . $raurl . '">' . $OUTPUT->pix_icon('t/edit', $stredit) . '</a> ';
+            echo ' <a title="' . $strcheck . '" href="' . $churl . '">' . $OUTPUT->pix_icon('t/preview', $strcheckpermissions) . '</a> ';
             echo "</p>\n";
         }
     }

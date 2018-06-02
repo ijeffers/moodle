@@ -29,18 +29,20 @@ require_once($CFG->dirroot.'/user/editadvanced_form.php');
 require_once($CFG->dirroot.'/user/editlib.php');
 require_once($CFG->dirroot.'/user/profile/lib.php');
 require_once($CFG->dirroot.'/user/lib.php');
-
-// HTTPS is required in this page when $CFG->loginhttps enabled.
-$PAGE->https_required();
+require_once($CFG->dirroot.'/webservice/lib.php');
 
 $id     = optional_param('id', $USER->id, PARAM_INT);    // User id; -1 if creating new user.
 $course = optional_param('course', SITEID, PARAM_INT);   // Course id (defaults to Site).
+$returnto = optional_param('returnto', null, PARAM_ALPHA);  // Code determining where to return to after save.
 
 $PAGE->set_url('/user/editadvanced.php', array('course' => $course, 'id' => $id));
 
 $course = $DB->get_record('course', array('id' => $course), '*', MUST_EXIST);
 
 if (!empty($USER->newadminuser)) {
+    // Ignore double clicks, we must finish all operations before cancelling request.
+    ignore_user_abort(true);
+
     $PAGE->set_course($SITE);
     $PAGE->set_pagelayout('maintenance');
 } else {
@@ -67,6 +69,7 @@ if ($id == -1) {
     $user->auth = 'manual';
     $user->confirmed = 1;
     $user->deleted = 0;
+    $user->timezone = '99';
     require_capability('moodle/user:create', $systemcontext);
     admin_externalpage_setup('addnewuser', '', array('id' => -1));
 } else {
@@ -74,6 +77,7 @@ if ($id == -1) {
     require_capability('moodle/user:update', $systemcontext);
     $user = $DB->get_record('user', array('id' => $id), '*', MUST_EXIST);
     $PAGE->set_context(context_user::instance($user->id));
+    $PAGE->navbar->includesettingsbase = true;
     if ($user->id != $USER->id) {
         $PAGE->navigation->extend_for_user($user);
     } else {
@@ -110,10 +114,7 @@ useredit_load_preferences($user);
 profile_load_data($user);
 
 // User interests.
-if (!empty($CFG->usetags)) {
-    require_once($CFG->dirroot.'/tag/lib.php');
-    $user->interests = tag_get_tags_array('user', $id);
-}
+$user->interests = core_tag_tag::get_item_tags_array('core', 'user', $id);
 
 if ($user->id !== -1) {
     $usercontext = context_user::instance($user->id);
@@ -148,13 +149,26 @@ $filemanageroptions = array('maxbytes'       => $CFG->maxbytes,
 file_prepare_draft_area($draftitemid, $filemanagercontext->id, 'user', 'newicon', 0, $filemanageroptions);
 $user->imagefile = $draftitemid;
 // Create form.
-$userform = new user_editadvanced_form(null, array(
+$userform = new user_editadvanced_form(new moodle_url($PAGE->url, array('returnto' => $returnto)), array(
     'editoroptions' => $editoroptions,
     'filemanageroptions' => $filemanageroptions,
-    'userid' => $user->id));
-$userform->set_data($user);
+    'user' => $user));
 
-if ($usernew = $userform->get_data()) {
+
+// Deciding where to send the user back in most cases.
+if ($returnto === 'profile') {
+    if ($course->id != SITEID) {
+        $returnurl = new moodle_url('/user/view.php', array('id' => $user->id, 'course' => $course->id));
+    } else {
+        $returnurl = new moodle_url('/user/profile.php', array('id' => $user->id));
+    }
+} else {
+    $returnurl = new moodle_url('/user/preferences.php', array('userid' => $user->id));
+}
+
+if ($userform->is_cancelled()) {
+    redirect($returnurl);
+} else if ($usernew = $userform->get_data()) {
     $usercreated = false;
 
     if (empty($usernew->auth)) {
@@ -210,6 +224,15 @@ if ($usernew = $userform->get_data()) {
                     print_error('cannotupdatepasswordonextauth', '', '', $usernew->auth);
                 }
                 unset_user_preference('create_password', $usernew); // Prevent cron from generating the password.
+
+                if (!empty($CFG->passwordchangelogout)) {
+                    // We can use SID of other user safely here because they are unique,
+                    // the problem here is we do not want to logout admin here when changing own password.
+                    \core\session\manager::kill_user_sessions($usernew->id, session_id());
+                }
+                if (!empty($usernew->signoutofotherservices)) {
+                    webservice::delete_user_ws_tokens($usernew->id);
+                }
             }
         }
 
@@ -225,13 +248,13 @@ if ($usernew = $userform->get_data()) {
     useredit_update_user_preference($usernew);
 
     // Update tags.
-    if (!empty($CFG->usetags) and empty($USER->newadminuser)) {
+    if (empty($USER->newadminuser) && isset($usernew->interests)) {
         useredit_update_interests($usernew, $usernew->interests);
     }
 
     // Update user picture.
     if (empty($USER->newadminuser)) {
-        useredit_update_picture($usernew, $userform, $filemanageroptions);
+        core_user::update_picture($usernew, $filemanageroptions);
     }
 
     // Update mail bounces.
@@ -274,11 +297,16 @@ if ($usernew = $userform->get_data()) {
         if (!empty($USER->newadminuser)) {
             unset($USER->newadminuser);
             // Apply defaults again - some of them might depend on admin user info, backup, roles, etc.
-            admin_apply_default_settings(null , false);
+            admin_apply_default_settings(null, false);
+            // Admin account is fully configured - set flag here in case the redirect does not work.
+            unset_config('adminsetuppending');
             // Redirect to admin/ to continue with installation.
             redirect("$CFG->wwwroot/$CFG->admin/");
+        } else if (empty($SITE->fullname)) {
+            // Somebody double clicked when editing admin user during install.
+            redirect("$CFG->wwwroot/$CFG->admin/");
         } else {
-            redirect("$CFG->wwwroot/user/view.php?id=$USER->id&course=$course->id");
+            redirect($returnurl);
         }
     } else {
         \core\session\manager::gc(); // Remove stale sessions.
@@ -287,18 +315,17 @@ if ($usernew = $userform->get_data()) {
     // Never reached..
 }
 
-// Make sure we really are on the https page when https login required.
-$PAGE->verify_https_required();
-
 
 // Display page header.
 if ($user->id == -1 or ($user->id != $USER->id)) {
     if ($user->id == -1) {
         echo $OUTPUT->header();
     } else {
-        $PAGE->set_heading($SITE->fullname);
-        echo $OUTPUT->header();
+        $streditmyprofile = get_string('editmyprofile');
         $userfullname = fullname($user, true);
+        $PAGE->set_heading($userfullname);
+        $PAGE->set_title("$course->shortname: $streditmyprofile - $userfullname");
+        echo $OUTPUT->header();
         echo $OUTPUT->heading($userfullname);
     }
 } else if (!empty($USER->newadminuser)) {
@@ -320,10 +347,10 @@ if ($user->id == -1 or ($user->id != $USER->id)) {
     $userfullname     = fullname($user, true);
 
     $PAGE->set_title("$course->shortname: $streditmyprofile");
-    $PAGE->set_heading($course->fullname);
+    $PAGE->set_heading($userfullname);
 
     echo $OUTPUT->header();
-    echo $OUTPUT->heading($userfullname);
+    echo $OUTPUT->heading($streditmyprofile);
 }
 
 // Finally display THE form.

@@ -52,6 +52,7 @@ Options:
 --lang=CODE           Installation and default site language. Default is en.
 --adminuser=USERNAME  Username for the moodle admin account. Default is admin.
 --adminpass=PASSWORD  Password for the moodle admin account.
+--adminemail=STRING   Email address for the moodle admin account.
 --agree-license       Indicates agreement with software license.
 --fullname=STRING     Name of the site
 --shortname=STRING    Name of the site
@@ -61,17 +62,12 @@ Example:
 \$sudo -u www-data /usr/bin/php admin/cli/install_database.php --lang=cs --adminpass=soMePass123 --agree-license
 ";
 
-// Check that PHP is of a sufficient version
-if (version_compare(phpversion(), "5.4.4") < 0) {
-    $phpversion = phpversion();
-    // do NOT localise - lang strings would not work here and we CAN NOT move it after installib
-    fwrite(STDERR, "Moodle 2.7 or later requires at least PHP 5.4.4 (currently using version $phpversion).\n");
-    fwrite(STDERR, "Please upgrade your server software or install older Moodle version.\n");
-    exit(1);
-}
+// Check that PHP is of a sufficient version as soon as possible.
+require_once(__DIR__.'/../../lib/phpminimumversionlib.php');
+moodle_require_minimum_php_version();
 
 // Nothing to do if config.php does not exist
-$configfile = dirname(dirname(dirname(__FILE__))).'/config.php';
+$configfile = __DIR__.'/../../config.php';
 if (!file_exists($configfile)) {
     fwrite(STDERR, 'config.php does not exist, can not continue'); // do not localize
     fwrite(STDERR, "\n");
@@ -102,6 +98,7 @@ list($options, $unrecognized) = cli_get_params(
         'lang'              => 'en',
         'adminuser'         => 'admin',
         'adminpass'         => '',
+        'adminemail'        => '',
         'fullname'          => '',
         'shortname'         => '',
         'agree-license'     => false,
@@ -124,6 +121,12 @@ if (!$options['agree-license']) {
 
 if ($options['adminpass'] === true or $options['adminpass'] === '') {
     cli_error('You have to specify admin password. --help prints out the help'); // TODO: localize
+}
+
+// Validate that the address provided was an e-mail address.
+if (!empty($options['adminemail']) && !validate_email($options['adminemail'])) {
+    $a = (object) array('option' => 'adminemail', 'value' => $options['adminemail']);
+    cli_error(get_string('cliincorrectvalueerror', 'admin', $a));
 }
 
 $options['lang'] = clean_param($options['lang'], PARAM_SAFEDIR);
@@ -174,6 +177,13 @@ if (!core_plugin_manager::instance()->all_plugins_ok($version, $failed)) {
 }
 
 install_cli_database($options, true);
+
+// This needs to happen at the end to ensure it occurs after all caches
+// have been purged for the last time.
+// This will build a cached version of the current theme for the user
+// to immediately start browsing the site.
+require_once($CFG->libdir.'/upgradelib.php');
+upgrade_themes();
 
 echo get_string('cliinstallfinished', 'install')."\n";
 exit(0); // 0 means success

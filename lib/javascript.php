@@ -30,12 +30,12 @@ define('NO_DEBUG_DISPLAY', true);
 define('ABORT_AFTER_CONFIG', true);
 require('../config.php'); // this stops immediately at the beginning of lib/setup.php
 require_once("$CFG->dirroot/lib/jslib.php");
-require_once("$CFG->dirroot/lib/classes/minify.php");
 
 if ($slashargument = min_get_slash_argument()) {
     $slashargument = ltrim($slashargument, '/');
     if (substr_count($slashargument, '/') < 1) {
-        image_not_found();
+        header('HTTP/1.0 404 not found');
+        die('Slash argument must contain both a revision and a file path');
     }
     // image must be last because it may contain "/"
     list($rev, $file) = explode('/', $slashargument, 2);
@@ -73,7 +73,8 @@ foreach ($files as $fsfile) {
 
 if (!$jsfiles) {
     // bad luck - no valid files
-    die();
+    header('HTTP/1.0 404 not found');
+    die('No valid javascript files found');
 }
 
 $etag = sha1($rev.implode(',', $jsfiles));
@@ -91,6 +92,15 @@ if ($rev > 0 and $rev < (time() + 60*60)) {
         js_send_cached($candidate, $etag);
 
     } else {
+        // The JS needs minfifying, so we're gonna have to load our full Moodle
+        // environment to process it..
+        define('ABORT_AFTER_CONFIG_CANCEL', true);
+
+        define('NO_MOODLE_COOKIES', true); // Session not used here.
+        define('NO_UPGRADE_CHECK', true);  // Ignore upgrade check.
+
+        require("$CFG->dirroot/lib/setup.php");
+
         js_write_cache_file_content($candidate, core_minify::js_files($jsfiles));
         // verify nothing failed in cache file creation
         clearstatcache();
@@ -104,4 +114,4 @@ $content = '';
 foreach ($jsfiles as $jsfile) {
     $content .= file_get_contents($jsfile)."\n";
 }
-js_send_uncached($content, $etag);
+js_send_uncached($content);

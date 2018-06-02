@@ -38,27 +38,42 @@ class file_temp_cleanup_task extends scheduled_task {
     }
 
     /**
-     * Do the job.
-     * Throw exceptions on errors (the job will be retried).
+     * Do the job, given the target directory.
+     *
+     * @param string $tmpdir The directory hosting the candidate stale temp files.
      */
-    public function execute() {
+    protected function execute_on($tmpdir) {
         global $CFG;
 
-        $tmpdir = $CFG->tempdir;
         // Default to last weeks time.
-        $time = strtotime('-1 week');
+        $time = time() - ($CFG->tempdatafoldercleanup * 3600);
 
         $dir = new \RecursiveDirectoryIterator($tmpdir);
         // Show all child nodes prior to their parent.
         $iter = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
 
+        // An array of the full path (key) and date last modified.
+        $modifieddateobject = array();
+
+        // Get the time modified for each directory node. Nodes will be updated
+        // once a file is deleted, so we need a list of the original values.
         for ($iter->rewind(); $iter->valid(); $iter->next()) {
             $node = $iter->getRealPath();
             if (!is_readable($node)) {
                 continue;
             }
+            $modifieddateobject[$node] = $iter->getMTime();
+        }
+
+        // Now loop through again and remove old files and directories.
+        for ($iter->rewind(); $iter->valid(); $iter->next()) {
+            $node = $iter->getRealPath();
+            if (!is_readable($node)) {
+                continue;
+            }
+
             // Check if file or directory is older than the given time.
-            if ($iter->getMTime() < $time) {
+            if ($modifieddateobject[$node] < $time) {
                 if ($iter->isDir() && !$iter->isDot()) {
                     // Don't attempt to delete the directory if it isn't empty.
                     if (!glob($node. DIRECTORY_SEPARATOR . '*')) {
@@ -72,9 +87,32 @@ class file_temp_cleanup_task extends scheduled_task {
                         mtrace("Failed removing file '$node'.");
                     }
                 }
+            } else {
+                // Return the time modified to the original date only for real files.
+                if ($iter->isDir() && !$iter->isDot()) {
+                    touch($node, $modifieddateobject[$node]);
+                }
             }
         }
-
     }
 
+    /**
+     * Do the job.
+     * Throw exceptions on errors (the job will be retried).
+     */
+    public function execute() {
+        global $CFG;
+
+        // The directories hosting the candidate stale temp files eventually are $CFG->tempdir and $CFG->backuptempdir.
+
+        // Do the job on each of the directories above.
+        // Let's start with $CFG->tempdir.
+        $this->execute_on($CFG->tempdir);
+
+        // Run on $CFG->backuptempdir too, if different from the default one, '$CFG->tempdir/backup'.
+        if (realpath(dirname($CFG->backuptempdir)) !== realpath($CFG->tempdir)) {
+            // The $CFG->backuptempdir setting is different from the default '$CFG->tempdir/backup'.
+            $this->execute_on($CFG->backuptempdir);
+        }
+    }
 }

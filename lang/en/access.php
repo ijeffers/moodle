@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -18,7 +17,7 @@
 /**
  * Strings for component 'access', language 'en', branch 'MOODLE_20_STABLE'
  *
- * @package   access
+ * @package   core_access
  * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -31,8 +30,6 @@ $string['activitynext'] = 'Next activity';
 $string['activityprev'] = 'Previous activity';
 $string['breadcrumb'] = 'Breadcrumb trail';
 $string['hideblocka'] = 'Hide {$a} block';
-$string['monthnext'] = 'Next month';
-$string['monthprev'] = 'Previous month';
 $string['showblocka'] = 'Show {$a} block';
 $string['sitemap'] = 'Site map';
 $string['skipa'] = 'Skip {$a}';
@@ -42,3 +39,7 @@ $string['skipto'] = 'Skip to {$a}';
 $string['tocontent'] = 'Skip to main content';
 $string['tonavigation'] = 'Go to navigation';
 $string['youarehere'] = 'You are here';
+
+// Deprecated since Moodle 3.4.
+$string['monthnext'] = 'Next month';
+$string['monthprev'] = 'Previous month';

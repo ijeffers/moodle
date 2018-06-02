@@ -23,14 +23,19 @@
                 $streditsummary  = get_string('editsummary');
                 $introcontent .= '<div class="editinglink"><a title="'.$streditsummary.'" '.
                                  '   href="modedit.php?update='.$cm->id.'&amp;sesskey='.sesskey().'">'.
-                                 '<img src="'.$OUTPUT->pix_url('t/edit') . '" '.
-                                 ' class="icon edit" alt="'.$streditsummary.'" /></a></div>';
+                                 $OUTPUT->pix_icon('t/edit', $streditsummary) . '</a></div>';
             }
             echo $OUTPUT->box($introcontent, 'generalbox', 'intro');
         }
 
         echo '<div class="subscribelink">', forum_get_subscribe_link($forum, $modcontext), '</div>';
-        forum_print_latest_discussions($course, $forum, 10, 'plain', '', false);
+
+        $numdiscussions = course_get_format($course)->get_course()->numdiscussions;
+        if ($numdiscussions < 1) {
+            // Make sure that the value is at least one.
+            $numdiscussions = 1;
+        }
+        forum_print_latest_discussions($course, $forum, $numdiscussions, 'plain', '', false);
 
     } else {
         echo $OUTPUT->notification('Could not find or create a social forum here');

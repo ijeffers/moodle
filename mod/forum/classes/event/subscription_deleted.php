@@ -48,7 +48,7 @@ class subscription_deleted extends \core\event\base {
      */
     protected function init() {
         $this->data['crud'] = 'd';
-        $this->data['edulevel'] = self::LEVEL_OTHER;
+        $this->data['edulevel'] = self::LEVEL_PARTICIPATING;
         $this->data['objecttable'] = 'forum_subscriptions';
     }
 
@@ -110,5 +110,16 @@ class subscription_deleted extends \core\event\base {
         if ($this->contextlevel != CONTEXT_MODULE) {
             throw new \coding_exception('Context level must be CONTEXT_MODULE.');
         }
+    }
+
+    public static function get_objectid_mapping() {
+        return array('db' => 'forum_subscriptions', 'restore' => 'forum_subscription');
+    }
+
+    public static function get_other_mapping() {
+        $othermapped = array();
+        $othermapped['forumid'] = array('db' => 'forum', 'restore' => 'forum');
+
+        return $othermapped;
     }
 }

@@ -43,30 +43,19 @@
  * @param object $block
  */
 function xmldb_block_badges_upgrade($oldversion, $block) {
-    global $DB;
+    global $CFG;
 
-    if ($oldversion < 2014062600) {
-        // Add this block the default blocks on /my.
-        $blockname = 'badges';
+    // Automatically generated Moodle v3.2.0 release upgrade line.
+    // Put any upgrade step following this.
 
-        $page = new moodle_page();
-        $page->set_context(context_system::instance());
+    // Automatically generated Moodle v3.3.0 release upgrade line.
+    // Put any upgrade step following this.
 
-        // Check to see if this block is already on the default /my page.
-        $criteria = array(
-            'blockname' => $blockname,
-            'parentcontextid' => $page->context->id,
-            'pagetypepattern' => 'my-index'
-        );
+    // Automatically generated Moodle v3.4.0 release upgrade line.
+    // Put any upgrade step following this.
 
-        if (!$DB->record_exists('block_instances', $criteria)) {
-            // Add the block to the default /my.
-            $page->blocks->add_region(BLOCK_POS_RIGHT);
-            $page->blocks->add_block($blockname, BLOCK_POS_RIGHT, 0, false, 'my-index');
-        }
-
-        upgrade_block_savepoint(true, 2014062600, $blockname);
-    }
+    // Automatically generated Moodle v3.5.0 release upgrade line.
+    // Put any upgrade step following this.
 
     return true;
 }

@@ -43,9 +43,9 @@ class cronlib_testcase extends basic_testcase {
         $time = 0;
 
         // Relative time stamps. Did you know data providers get executed during phpunit init?
-        $lastweekstime = -(7 * 24 * 60 * 60);
-        $beforelastweekstime = $lastweekstime - 60;
-        $afterlastweekstime = $lastweekstime + 60;
+        $lastweekstime = -($CFG->tempdatafoldercleanup * 3600); // This must match file_temp_cleanup_task.
+        $beforelastweekstime = $lastweekstime - 3600 - 1; // At least 1h and 1s diff (make it DST immune).
+        $afterlastweekstime = $lastweekstime + 3600 + 1; // At least 1h and 1s diff (make it DST immune).
 
         $nodes = array();
         // Really old directory to remove.
@@ -54,8 +54,8 @@ class cronlib_testcase extends basic_testcase {
         // New Directory to keep.
         $nodes[] = $this->generate_test_path('/dir1/dir1_2/', true, $time, true);
 
-        // Directory exactly 1 week old, keep.
-        $nodes[] = $this->generate_test_path('/dir2/', true, $lastweekstime, true);
+        // Directory a little less than 1 week old, keep.
+        $nodes[] = $this->generate_test_path('/dir2/', true, $afterlastweekstime, true);
 
         // Directory older than 1 week old, remove.
         $nodes[] = $this->generate_test_path('/dir3/', true, $beforelastweekstime, false);
@@ -147,7 +147,7 @@ class cronlib_testcase extends basic_testcase {
     public function test_cron_delete_from_temp($nodes, $expected) {
         global $CFG;
 
-        $tmpdir = $CFG->tempdir;
+        $tmpdir = realpath($CFG->tempdir);
 
         foreach ($nodes as $data) {
             if ($data->isdir) {
@@ -168,7 +168,12 @@ class cronlib_testcase extends basic_testcase {
 
         $actual = array();
         for ($iter->rewind(); $iter->valid(); $iter->next()) {
-            if (!$iter->isDot()) {
+            $isvalid = true;
+            $isvalid = $isvalid && !$iter->isDot();
+            // Remove the default $CFG->tempdir/backup directory and $CFG->tempdir/.htaccess file from this comparison.
+            $isvalid = $isvalid && !($iter->isDir() && ($iter->getRealpath() === $tmpdir . DIRECTORY_SEPARATOR . 'backup'));
+            $isvalid = $isvalid && !($iter->isFile() && ($iter->getRealpath() === $tmpdir . DIRECTORY_SEPARATOR . '.htaccess'));
+            if ($isvalid) {
                 $actual[] = $iter->getRealPath();
             }
         }

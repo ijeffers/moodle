@@ -24,7 +24,6 @@ $adminroot = admin_get_root(); // need all settings
 // now we'll deal with the case that the admin has submitted the form with new settings
 if ($data = data_submitted() and confirm_sesskey()) {
     $count = admin_write_settings($data);
-    $adminroot = admin_get_root(true); //reload tree
 }
 
 $newsettings = admin_output_new_settings_by_page($adminroot);
@@ -68,7 +67,7 @@ echo '<fieldset>';
 echo '<div class="clearer"><!-- --></div>';
 echo $newsettingshtml;
 echo '</fieldset>';
-echo '<div class="form-buttons"><input class="form-submit" type="submit" value="'.get_string('savechanges','admin').'" /></div>';
+echo '<div class="form-buttons"><input class="form-submit btn btn-primary" type="submit" value="'.get_string('savechanges','admin').'" /></div>';
 echo '</div>';
 echo '</form>';
 

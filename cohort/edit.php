@@ -30,6 +30,8 @@ require($CFG->dirroot.'/cohort/edit_form.php');
 $id        = optional_param('id', 0, PARAM_INT);
 $contextid = optional_param('contextid', 0, PARAM_INT);
 $delete    = optional_param('delete', 0, PARAM_BOOL);
+$show      = optional_param('show', 0, PARAM_BOOL);
+$hide      = optional_param('hide', 0, PARAM_BOOL);
 $confirm   = optional_param('confirm', 0, PARAM_BOOL);
 $returnurl = optional_param('returnurl', '', PARAM_LOCALURL);
 
@@ -98,15 +100,34 @@ if ($delete and $cohort->id) {
     die;
 }
 
-$editoroptions = array('maxfiles'=>0, 'context'=>$context);
+if ($show && $cohort->id && confirm_sesskey()) {
+    if (!$cohort->visible) {
+        $record = (object)array('id' => $cohort->id, 'visible' => 1, 'contextid' => $cohort->contextid);
+        cohort_update_cohort($record);
+    }
+    redirect($returnurl);
+}
+
+if ($hide && $cohort->id && confirm_sesskey()) {
+    if ($cohort->visible) {
+        $record = (object)array('id' => $cohort->id, 'visible' => 0, 'contextid' => $cohort->contextid);
+        cohort_update_cohort($record);
+    }
+    redirect($returnurl);
+}
+
+$editoroptions = array('maxfiles' => EDITOR_UNLIMITED_FILES,
+    'maxbytes' => $SITE->maxbytes, 'context' => $context);
 if ($cohort->id) {
     // Edit existing.
-    $cohort = file_prepare_standard_editor($cohort, 'description', $editoroptions, $context);
+    $cohort = file_prepare_standard_editor($cohort, 'description', $editoroptions,
+            $context, 'cohort', 'description', $cohort->id);
     $strheading = get_string('editcohort', 'cohort');
 
 } else {
     // Add new.
-    $cohort = file_prepare_standard_editor($cohort, 'description', $editoroptions, $context);
+    $cohort = file_prepare_standard_editor($cohort, 'description', $editoroptions,
+            $context, 'cohort', 'description', null);
     $strheading = get_string('addcohort', 'cohort');
 }
 
@@ -120,12 +141,30 @@ if ($editform->is_cancelled()) {
     redirect($returnurl);
 
 } else if ($data = $editform->get_data()) {
-    $data = file_postupdate_standard_editor($data, 'description', $editoroptions, $context);
+    $oldcontextid = $context->id;
+    $editoroptions['context'] = $context = context::instance_by_id($data->contextid);
 
     if ($data->id) {
+        if ($data->contextid != $oldcontextid) {
+            // Cohort was moved to another context.
+            get_file_storage()->move_area_files_to_new_context($oldcontextid, $context->id,
+                    'cohort', 'description', $data->id);
+        }
+        $data = file_postupdate_standard_editor($data, 'description', $editoroptions,
+                $context, 'cohort', 'description', $data->id);
         cohort_update_cohort($data);
     } else {
-        cohort_add_cohort($data);
+        $data->descriptionformat = $data->description_editor['format'];
+        $data->description = $description = $data->description_editor['text'];
+        $data->id = cohort_add_cohort($data);
+        $editoroptions['context'] = $context = context::instance_by_id($data->contextid);
+        $data = file_postupdate_standard_editor($data, 'description', $editoroptions,
+                $context, 'cohort', 'description', $data->id);
+        if ($description != $data->description) {
+            $updatedata = (object)array('id' => $data->id,
+                'description' => $data->description, 'contextid' => $context->id);
+            cohort_update_cohort($updatedata);
+        }
     }
 
     if ($returnurl->get_param('showall') || $returnurl->get_param('contextid') == $data->contextid) {

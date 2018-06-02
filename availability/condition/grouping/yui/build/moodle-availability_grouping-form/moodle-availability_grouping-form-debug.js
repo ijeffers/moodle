@@ -33,17 +33,17 @@ M.availability_grouping.form.initInner = function(groupings) {
 
 M.availability_grouping.form.getNode = function(json) {
     // Create HTML structure.
-    var strings = M.str.availability_grouping;
-    var html = '<label>' + strings.title + ' <span class="availability-group">' +
-            '<select name="id">' +
-            '<option value="choose">' + M.str.moodle.choosedots + '</option>';
+    var html = '<label><span class="p-r-1">' + M.util.get_string('title', 'availability_grouping') + '</span> ' +
+            '<span class="availability-group">' +
+            '<select name="id" class="custom-select">' +
+            '<option value="choose">' + M.util.get_string('choosedots', 'moodle') + '</option>';
     for (var i = 0; i < this.groupings.length; i++) {
         var grouping = this.groupings[i];
         // String has already been escaped using format_string.
         html += '<option value="' + grouping.id + '">' + grouping.name + '</option>';
     }
     html += '</select></span></label>';
-    var node = Y.Node.create('<span>' + html + '</span>');
+    var node = Y.Node.create('<span class="form-inline">' + html + '</span>');
 
     // Set initial value if specified.
     if (json.id !== undefined &&
@@ -54,7 +54,7 @@ M.availability_grouping.form.getNode = function(json) {
     // Add event handlers (first time only).
     if (!M.availability_grouping.form.addedEvents) {
         M.availability_grouping.form.addedEvents = true;
-        var root = Y.one('#fitem_id_availabilityconditionsjson');
+        var root = Y.one('.availability-field');
         root.delegate('change', function() {
             // Just update the form fields.
             M.core_availability.form.update();

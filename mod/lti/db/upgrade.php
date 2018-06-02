@@ -30,7 +30,7 @@
 //
 // BasicLTI4Moodle is copyright 2009 by Marc Alier Forment, Jordi Piguillem and Nikolas Galanis
 // of the Universitat Politecnica de Catalunya http://www.upc.edu
-// Contact info: Marc Alier Forment granludo @ gmail.com or marc.alier @ upc.edu
+// Contact info: Marc Alier Forment granludo @ gmail.com or marc.alier @ upc.edu.
 
 /**
  * This file keeps track of upgrades to the lti module
@@ -63,42 +63,83 @@ function xmldb_lti_upgrade($oldversion) {
 
     $dbman = $DB->get_manager();
 
+    if ($oldversion < 2016052301) {
 
-    // Moodle v2.2.0 release upgrade line
-    // Put any upgrade step following this
+        // Changing type of field value on table lti_types_config to text.
+        $table = new xmldb_table('lti_types_config');
+        $field = new xmldb_field('value', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null, 'name');
 
-    // Moodle v2.3.0 release upgrade line
-    // Put any upgrade step following this
-
-
-    // Moodle v2.4.0 release upgrade line
-    // Put any upgrade step following this
-
-
-    // Moodle v2.5.0 release upgrade line.
-    // Put any upgrade step following this.
-
-
-    // Moodle v2.6.0 release upgrade line.
-    // Put any upgrade step following this.
-
-    // Moodle v2.7.0 release upgrade line.
-    // Put any upgrade step following this.
-
-    if ($oldversion < 2014060201) {
-
-        // Changing type of field grade on table lti to int.
-        $table = new xmldb_table('lti');
-        $field = new xmldb_field('grade', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '100',
-                'instructorchoiceacceptgrades');
-
-        // Launch change of type for field grade.
+        // Launch change of type for field value.
         $dbman->change_field_type($table, $field);
 
         // Lti savepoint reached.
-        upgrade_mod_savepoint(true, 2014060201, 'lti');
+        upgrade_mod_savepoint(true, 2016052301, 'lti');
     }
 
-    return true;
-}
+    // Automatically generated Moodle v3.2.0 release upgrade line.
+    // Put any upgrade step following this.
 
+    // Automatically generated Moodle v3.3.0 release upgrade line.
+    // Put any upgrade step following this.
+
+    // Automatically generated Moodle v3.4.0 release upgrade line.
+    // Put any upgrade step following this.
+
+    if ($oldversion < 2017111301) {
+
+        // A bug in the LTI plugin incorrectly inserted a grade item for
+        // LTI instances which were set to not allow grading.
+        // The change finds any LTI which does not have grading enabled,
+        // and updates any grades to delete them.
+
+        $ltis = $DB->get_recordset_sql("
+                SELECT
+                       l.id,
+                       l.course,
+                       l.instructorchoiceacceptgrades,
+                       t.enabledcapability,
+                       t.toolproxyid,
+                       tc.value AS acceptgrades
+                  FROM {lti} l
+            INNER JOIN {grade_items} gt
+                    ON l.id = gt.iteminstance
+             LEFT JOIN {lti_types} t
+                    ON t.id = l.typeid
+             LEFT JOIN {lti_types_config} tc
+                    ON tc.typeid = t.id AND tc.name = 'acceptgrades'
+                 WHERE gt.itemmodule = 'lti'
+                   AND gt.itemtype = 'mod'
+        ");
+
+        foreach ($ltis as $lti) {
+            $acceptgrades = true;
+            if (empty($lti->toolproxyid)) {
+                $typeacceptgrades = isset($lti->acceptgrades) ? $lti->acceptgrades : 2;
+                if (!($typeacceptgrades == 1 ||
+                        ($typeacceptgrades == 2 && $lti->instructorchoiceacceptgrades == 1))) {
+                    $acceptgrades = false;
+                }
+            } else {
+                $enabledcapabilities = explode("\n", $lti->enabledcapability);
+                $acceptgrades = in_array('Result.autocreate', $enabledcapabilities);
+            }
+
+            if (!$acceptgrades) {
+                // Required when doing CLI upgrade.
+                require_once($CFG->libdir . '/gradelib.php');
+                grade_update('mod/lti', $lti->course, 'mod', 'lti', $lti->id, 0, null, array('deleted' => 1));
+            }
+
+        }
+
+        $ltis->close();
+
+        upgrade_mod_savepoint(true, 2017111301, 'lti');
+    }
+
+    // Automatically generated Moodle v3.5.0 release upgrade line.
+    // Put any upgrade step following this.
+
+    return true;
+
+}

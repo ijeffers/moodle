@@ -30,28 +30,74 @@ defined('MOODLE_INTERNAL') || die();
  * @return bool
  */
 function xmldb_editor_atto_upgrade($oldversion) {
-    global $CFG, $DB;
+    global $CFG;
 
-    $dbman = $DB->get_manager();
+    // Automatically generated Moodle v3.2.0 release upgrade line.
+    // Put any upgrade step following this.
 
-    if ($oldversion < 2014032800) {
-        // Make Atto the default.
-        $currenteditors = $CFG->texteditors;
-        $neweditors = array();
+    // Automatically generated Moodle v3.3.0 release upgrade line.
+    // Put any upgrade step following this.
 
-        $list = explode(',', $currenteditors);
-        array_push($neweditors, 'atto');
-        foreach ($list as $editor) {
-            if ($editor != 'atto') {
-                array_push($neweditors, $editor);
+    // Automatically generated Moodle v3.4.0 release upgrade line.
+    // Put any upgrade step following this.
+
+    if ($oldversion < 2018041100) {
+        $toolbar = get_config('editor_atto', 'toolbar');
+
+        if (strpos($toolbar, 'recordrtc') === false) {
+            $glue = "\r\n";
+            if (strpos($toolbar, $glue) === false) {
+                $glue = "\n";
+            }
+            $groups = explode($glue, $toolbar);
+            // Try to put recordrtc in files group.
+            foreach ($groups as $i => $group) {
+                $parts = explode('=', $group);
+                if (trim($parts[0]) == 'files') {
+                    $groups[$i] = 'files = ' . trim($parts[1]) . ', recordrtc';
+                    // Update config variable.
+                    $toolbar = implode($glue, $groups);
+                    set_config('toolbar', $toolbar, 'editor_atto');
+                }
             }
         }
 
-        set_config('texteditors', implode(',', $neweditors));
-        upgrade_plugin_savepoint(true, 2014032800, 'editor', 'atto');
+        // Atto editor savepoint reached.
+        upgrade_plugin_savepoint(true, 2018041100, 'editor', 'atto');
     }
 
-    // Moodle v2.7.0 release upgrade line.
+    if ($oldversion < 2018051401) {
+        $toolbar = get_config('editor_atto', 'toolbar');
+        $glue = "\r\n";
+        $iconorderold = 'image, media, managefiles, recordrtc';
+        $iconordernew = 'image, media, recordrtc, managefiles';
+
+        if (strpos($toolbar, $glue) === false) {
+            $glue = "\n";
+        }
+
+        $groups = explode($glue, $toolbar);
+
+        // Reorder atto media icons if in default configuration.
+        foreach ($groups as $i => $group) {
+            $parts = explode('=', $group);
+
+            if (trim($parts[0]) == 'files') {
+                if (trim(preg_replace('/,\s*/', ', ', $parts[1])) == $iconorderold) {
+                    $groups[$i] = 'files = ' . $iconordernew;
+
+                    // Update config variable.
+                    $toolbar = implode($glue, $groups);
+                    set_config('toolbar', $toolbar, 'editor_atto');
+                }
+            }
+        }
+
+        // Atto editor savepoint reached.
+        upgrade_plugin_savepoint(true, 2018051401, 'editor', 'atto');
+    }
+
+    // Automatically generated Moodle v3.5.0 release upgrade line.
     // Put any upgrade step following this.
 
     return true;

@@ -42,6 +42,7 @@ class frontend extends \core_availability\frontend {
             \section_info $section = null) {
         global $DB, $CFG;
         require_once($CFG->libdir . '/gradelib.php');
+        require_once($CFG->dirroot . '/course/lib.php');
 
         // Get grades as basic associative array.
         $gradeoptions = array();
@@ -49,13 +50,17 @@ class frontend extends \core_availability\frontend {
         // For some reason the fetch_all things return null if none.
         $items = $items ? $items : array();
         foreach ($items as $id => $item) {
+            // Don't include the grade item if it's linked with a module that is being deleted.
+            if (course_module_instance_pending_deletion($item->courseid, $item->itemmodule, $item->iteminstance)) {
+                continue;
+            }
             // Do not include grades for current item.
             if ($cm && $cm->instance == $item->iteminstance
                     && $cm->modname == $item->itemmodule
                     && $item->itemtype == 'mod') {
                 continue;
             }
-            $gradeoptions[$id] = $item->get_name();
+            $gradeoptions[$id] = $item->get_name(true);
         }
         \core_collator::asort($gradeoptions);
 

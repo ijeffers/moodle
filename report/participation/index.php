@@ -25,6 +25,7 @@
 
 require('../../config.php');
 require_once($CFG->dirroot.'/lib/tablelib.php');
+require_once($CFG->dirroot.'/notes/lib.php');
 require_once($CFG->dirroot.'/report/participation/locallib.php');
 
 define('DEFAULT_PAGE_SIZE', 20);
@@ -37,7 +38,7 @@ $timefrom   = optional_param('timefrom', 0, PARAM_INT); // how far back to look.
 $action     = optional_param('action', '', PARAM_ALPHA);
 $page       = optional_param('page', 0, PARAM_INT);                     // which page to show
 $perpage    = optional_param('perpage', DEFAULT_PAGE_SIZE, PARAM_INT);  // how many per page
-$currentgroup = optional_param('group', 0, PARAM_INT); // Get the active group.
+$currentgroup = optional_param('group', null, PARAM_INT); // Get the active group.
 
 $url = new moodle_url('/report/participation/index.php', array('id'=>$id));
 if ($roleid !== 0) $url->param('roleid');
@@ -75,11 +76,11 @@ if (!array_key_exists($action, $actionoptions)) {
     $action = '';
 }
 
-$PAGE->set_title($course->shortname .': '. $strparticipation);
-$PAGE->set_heading($course->fullname);
+$PAGE->set_title(format_string($course->shortname, true, array('context' => $context)) .': '. $strparticipation);
+$PAGE->set_heading(format_string($course->fullname, true, array('context' => $context)));
 echo $OUTPUT->header();
 
-$uselegacyreader = false; // Use legacy reader with sql_internal_reader to aggregate records.
+$uselegacyreader = false; // Use legacy reader with sql_internal_table_reader to aggregate records.
 $onlyuselegacyreader = false; // Use only legacy log table to aggregate records.
 
 $logtable = report_participation_get_log_table_name(); // Log table to use for fetaching records.
@@ -100,7 +101,7 @@ if (!$onlyuselegacyreader && empty($logtable)) {
 
 $modinfo = get_fast_modinfo($course);
 
-$minloginternalreader = 0; // Time of first record in sql_internal_reader.
+$minloginternalreader = 0; // Time of first record in sql_internal_table_reader.
 
 if ($onlyuselegacyreader) {
     // If no sql_inrenal_reader enabled then get min. time from log table.
@@ -117,17 +118,26 @@ if ($onlyuselegacyreader) {
     if (empty($minlog) || ($minloginternalreader <= $minlog)) {
         $uselegacyreader = false;
         $minlog = $minloginternalreader;
-    } else if (!empty($timefrom) && ($minloginternalreader > $timefrom)) {
-        // If timefrom is less then first record in sql_internal_reader then get record from legacy log only.
-        $onlyuselegacyreader = true;
+    }
+
+    // If timefrom is greater then first record in sql_internal_table_reader then get record from sql_internal_table_reader only.
+    if (!empty($timefrom) && ($minloginternalreader < $timefrom)) {
+        $uselegacyreader = false;
     }
 }
 
 // Print first controls.
 report_participation_print_filter_form($course, $timefrom, $minlog, $action, $roleid, $instanceid);
 
-$baseurl =  $CFG->wwwroot.'/report/participation/index.php?id='.$course->id.'&amp;roleid='
-    .$roleid.'&amp;instanceid='.$instanceid.'&amp;timefrom='.$timefrom.'&amp;action='.$action.'&amp;perpage='.$perpage;
+$baseurl = new moodle_url('/report/participation/index.php', array(
+    'id' => $course->id,
+    'roleid' => $roleid,
+    'instanceid' => $instanceid,
+    'timefrom' => $timefrom,
+    'action' => $action,
+    'perpage' => $perpage,
+    'group' => $currentgroup
+));
 $select = groups_allgroups_course_menu($course, $baseurl, true, $currentgroup);
 
 // User cannot see any group.
@@ -164,11 +174,17 @@ if (!empty($instanceid) && !empty($roleid)) {
     $table = new flexible_table('course-participation-'.$course->id.'-'.$cm->id.'-'.$roleid);
     $table->course = $course;
 
-    $table->define_columns(array('fullname','count','select'));
-    $table->define_headers(array(get_string('user'),((!empty($action)) ? get_string($action) : get_string('allactions')),get_string('select')));
+    $actionheader = !empty($action) ? get_string($action) : get_string('allactions');
+
+    if (empty($CFG->messaging)) {
+        $table->define_columns(array('fullname', 'count'));
+        $table->define_headers(array(get_string('user'), $actionheader));
+    } else {
+        $table->define_columns(array('fullname', 'count', 'select'));
+        $table->define_headers(array(get_string('user'), $actionheader, get_string('select')));
+    }
     $table->define_baseurl($baseurl);
 
-    $table->set_attribute('cellpadding','5');
     $table->set_attribute('class', 'generaltable generalbox reporttable');
 
     $table->sortable(true,'lastname','ASC');
@@ -206,6 +222,7 @@ if (!empty($instanceid) && !empty($roleid)) {
 
     list($twhere, $tparams) = $table->get_sql_where();
     if ($twhere) {
+        $params = array_merge($params, $tparams);
         $matchcount = $DB->count_records_sql($countsql.' AND '.$twhere, $params);
     } else {
         $matchcount = $totalcount;
@@ -250,7 +267,6 @@ if (!empty($instanceid) && !empty($roleid)) {
                 " GROUP BY userid) l ON (l.userid = ra.userid)";
         if ($twhere) {
             $sql .= ' WHERE '.$twhere; // Initial bar.
-            $params = array_merge($params, $tparams);
         }
 
         if ($table->get_sql_sort()) {
@@ -261,31 +277,30 @@ if (!empty($instanceid) && !empty($roleid)) {
         }
     }
 
-    // Get record from sql_internal_reader and merge with records got from legacy log (if needed).
+    // Get record from sql_internal_table_reader and merge with records got from legacy log (if needed).
     if (!$onlyuselegacyreader) {
-        $sql = "SELECT ra.userid, $usernamefields, u.idnumber, l.actioncount AS count
-                  FROM (SELECT DISTINCT userid FROM {role_assignments} WHERE contextid $relatedctxsql AND roleid = :roleid ) ra
-                  JOIN {user} u ON u.id = ra.userid
+        $sql = "SELECT ra.userid, $usernamefields, u.idnumber, COUNT(DISTINCT l.timecreated) AS count
+                  FROM {user} u
+                  JOIN {role_assignments} ra ON u.id = ra.userid AND ra.contextid $relatedctxsql AND ra.roleid = :roleid
              $groupsql
-             LEFT JOIN (
-                    SELECT userid, COUNT(crud) AS actioncount
-                      FROM {" . $logtable . "}
-                     WHERE contextinstanceid = :instanceid
-                       AND timecreated > :timefrom" . $crudsql ."
-                       AND edulevel = :edulevel
-                       AND anonymous = 0
-                       AND contextlevel = :contextlevel
-                       AND (origin = 'web' OR origin = 'ws')
-                  GROUP BY userid) l ON (l.userid = ra.userid)";
+                  LEFT JOIN {" . $logtable . "} l
+                     ON l.contextinstanceid = :instanceid
+                       AND l.timecreated > :timefrom" . $crudsql ."
+                       AND l.edulevel = :edulevel
+                       AND l.anonymous = 0
+                       AND l.contextlevel = :contextlevel
+                       AND (l.origin = 'web' OR l.origin = 'ws')
+                       AND l.userid = ra.userid";
+        // We add this after the WHERE statement that may come below.
+        $groupbysql = " GROUP BY ra.userid, $usernamefields, u.idnumber";
 
         $params['edulevel'] = core\event\base::LEVEL_PARTICIPATING;
         $params['contextlevel'] = CONTEXT_MODULE;
 
         if ($twhere) {
             $sql .= ' WHERE '.$twhere; // Initial bar.
-            $params = array_merge($params, $tparams);
         }
-
+        $sql .= $groupbysql;
         if ($table->get_sql_sort()) {
             $sql .= ' ORDER BY '.$table->get_sql_sort();
         }
@@ -313,7 +328,7 @@ if (!empty($instanceid) && !empty($roleid)) {
 
     $a = new stdClass();
     $a->count = $totalcount;
-    $a->items = $role->name;
+    $a->items = format_string($role->name, true, array('context' => $context));
 
     if ($matchcount != $totalcount) {
         $a->count = $matchcount.'/'.$a->count;
@@ -321,48 +336,64 @@ if (!empty($instanceid) && !empty($roleid)) {
 
     echo '<h2>'.get_string('counteditems', '', $a).'</h2>'."\n";
 
-    echo '<form action="'.$CFG->wwwroot.'/user/action_redir.php" method="post" id="studentsform">'."\n";
-    echo '<div>'."\n";
-    echo '<input type="hidden" name="id" value="'.$id.'" />'."\n";
-    echo '<input type="hidden" name="returnto" value="'. s($PAGE->url) .'" />'."\n";
-    echo '<input type="hidden" name="sesskey" value="'.sesskey().'" />'."\n";
+    if (!empty($CFG->messaging)) {
+        echo '<form action="'.$CFG->wwwroot.'/user/action_redir.php" method="post" id="participantsform">'."\n";
+        echo '<div>'."\n";
+        echo '<input type="hidden" name="id" value="'.$id.'" />'."\n";
+        echo '<input type="hidden" name="returnto" value="'. s($PAGE->url) .'" />'."\n";
+        echo '<input type="hidden" name="sesskey" value="'.sesskey().'" />'."\n";
+    }
 
     foreach ($users as $u) {
-        $data = array('<a href="'.$CFG->wwwroot.'/user/view.php?id='.$u->userid.'&amp;course='.$course->id.'">'.fullname($u,true).'</a>'."\n",
-                      ((!empty($u->count)) ? get_string('yes').' ('.$u->count.') ' : get_string('no')),
-                      '<input type="checkbox" class="usercheckbox" name="user'.$u->userid.'" value="'.$u->count.'" />'."\n",
-                      );
+        $data = array();
+        $data[] = html_writer::link(new moodle_url('/user/view.php', array('id' => $u->userid, 'course' => $course->id)),
+            fullname($u, true));
+        $data[] = !empty($u->count) ? get_string('yes').' ('.$u->count.') ' : get_string('no');
+
+        if (!empty($CFG->messaging)) {
+            $data[] = '<input type="checkbox" class="usercheckbox" name="user'.$u->userid.'" value="'.$u->count.'" />';
+        }
         $table->add_data($data);
     }
 
     $table->print_html();
 
     if ($perpage == SHOW_ALL_PAGE_SIZE) {
-        echo '<div id="showall"><a href="'.$baseurl.'&amp;perpage='.DEFAULT_PAGE_SIZE.'">'.get_string('showperpage', '', DEFAULT_PAGE_SIZE).'</a></div>'."\n";
-    }
-    else if ($matchcount > 0 && $perpage < $matchcount) {
-        echo '<div id="showall"><a href="'.$baseurl.'&amp;perpage='.SHOW_ALL_PAGE_SIZE.'">'.get_string('showall', '', $matchcount).'</a></div>'."\n";
+        $perpageurl = new moodle_url($baseurl, array('perpage' => DEFAULT_PAGE_SIZE));
+        echo html_writer::start_div('', array('id' => 'showall'));
+        echo html_writer::link($perpageurl, get_string('showperpage', '', DEFAULT_PAGE_SIZE));
+        echo html_writer::end_div();
+    } else if ($matchcount > 0 && $perpage < $matchcount) {
+        $perpageurl = new moodle_url($baseurl, array('perpage' => SHOW_ALL_PAGE_SIZE));
+        echo html_writer::start_div('', array('id' => 'showall'));
+        echo html_writer::link($perpageurl, get_string('showall', '', $matchcount));
+        echo html_writer::end_div();
     }
 
-    echo '<div class="selectbuttons">';
-    echo '<input type="button" id="checkall" value="'.get_string('selectall').'" /> '."\n";
-    echo '<input type="button" id="checknone" value="'.get_string('deselectall').'" /> '."\n";
-    if ($perpage >= $matchcount) {
-        echo '<input type="button" id="checknos" value="'.get_string('selectnos').'" />'."\n";
-    }
-    echo '</div>';
-    echo '<div>';
-    echo html_writer::label(get_string('withselectedusers'), 'formactionselect');
-    $displaylist['messageselect.php'] = get_string('messageselectadd');
-    echo html_writer::select($displaylist, 'formaction', '', array(''=>'choosedots'), array('id'=>'formactionselect'));
-    echo $OUTPUT->help_icon('withselectedusers');
-    echo '<input type="submit" value="' . get_string('ok') . '" />'."\n";
-    echo '</div>';
-    echo '</div>'."\n";
-    echo '</form>'."\n";
-    echo '</div>'."\n";
+    if (!empty($CFG->messaging)) {
+        $buttonclasses = 'btn btn-secondary';
+        echo '<div class="selectbuttons btn-group">';
+        echo '<input type="button" id="checkallonpage" value="'.get_string('selectall').'" class="'. $buttonclasses .'"> '."\n";
+        echo '<input type="button" id="checknone" value="'.get_string('deselectall').'" class="'. $buttonclasses .'"> '."\n";
+        if ($perpage >= $matchcount) {
+            echo '<input type="button" id="checkallnos" value="'.get_string('selectnos').'" class="'. $buttonclasses .'">'."\n";
+        }
+        echo '</div>';
+        echo '<div class="p-y-1">';
+        echo html_writer::label(get_string('withselectedusers'), 'formactionselect');
+        $displaylist['#messageselect'] = get_string('messageselectadd');
+        echo html_writer::select($displaylist, 'formaction', '', array('' => 'choosedots'), array('id' => 'formactionid'));
+        echo '</div>';
+        echo '</div>'."\n";
+        echo '</form>'."\n";
 
-    $PAGE->requires->js_init_call('M.report_participation.init');
+        $options = new stdClass();
+        $options->courseid = $course->id;
+        $options->noteStateNames = note_get_state_names();
+        $options->stateHelpIcon = $OUTPUT->help_icon('publishstate', 'notes');
+        $PAGE->requires->js_call_amd('core_user/participants', 'init', [$options]);
+    }
+    echo '</div>'."\n";
 }
 
 echo $OUTPUT->footer();

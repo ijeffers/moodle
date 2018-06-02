@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -18,7 +17,7 @@
 /**
  * Strings for the advanced grading methods subsystem
  *
- * @package    core
+ * @package    core_grading
  * @subpackage grading
  * @copyright  2011 David Mudrak <david@moodle.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -58,6 +57,27 @@ $string['manageactionshareconfirm'] = 'You are going to save a copy of the gradi
 $string['manageactionsharedone'] = 'The form was successfully saved as a template';
 $string['noitemid'] = 'Grading not possible. The graded item does not exist.';
 $string['nosharedformfound'] = 'No template found';
+$string['privacy:metadata:gradingformpluginsummary'] = 'Data for the grading method.';
+$string['privacy:metadata:grading_definitions'] = 'Basic information about an advanced grading form defined in a gradable area.';
+$string['privacy:metadata:grading_definitions:areaid'] = 'The area ID where the advanced grading form is defined.';
+$string['privacy:metadata:grading_definitions:copiedfromid'] = 'The grading definition ID from where this was copied.';
+$string['privacy:metadata:grading_definitions:description'] = 'The description of the advanced grading method.';
+$string['privacy:metadata:grading_definitions:method'] = 'The grading method which is responsible for the definition.';
+$string['privacy:metadata:grading_definitions:name'] = 'The name of the advanced grading definition.';
+$string['privacy:metadata:grading_definitions:options'] = 'Some settings of this grading definition.';
+$string['privacy:metadata:grading_definitions:status'] = 'The status of this advanced grading definition.';
+$string['privacy:metadata:grading_definitions:timecopied'] = 'The time when the grading definition was copied.';
+$string['privacy:metadata:grading_definitions:timecreated'] = 'The time when the grading definition was created.';
+$string['privacy:metadata:grading_definitions:timemodified'] = 'The time when the grading definition was last modified.';
+$string['privacy:metadata:grading_definitions:usercreated'] = 'The ID of the user who created the grading definition.';
+$string['privacy:metadata:grading_definitions:usermodified'] = 'The ID of the user who last modified the grading definition.';
+$string['privacy:metadata:grading_instances'] = 'Assessment record for one gradable item assessed by one rater.';
+$string['privacy:metadata:grading_instances:feedback'] = 'The feedback given by the user.';
+$string['privacy:metadata:grading_instances:feedbackformat'] = 'The text format of the feedback given by the user.';
+$string['privacy:metadata:grading_instances:raterid'] = 'The ID of the user who rated the grading instance.';
+$string['privacy:metadata:grading_instances:rawgrade'] = 'The grade for the grading instance.';
+$string['privacy:metadata:grading_instances:status'] = 'The status of this grading instance.';
+$string['privacy:metadata:grading_instances:timemodified'] = 'The time when the grading instance was last modified.';
 $string['searchtemplate'] = 'Grading forms search';
 $string['searchtemplate_help'] = 'You can search for a grading form and use it as a template for the new grading form here. Simply type words that should appear somewhere in the form name, its description or the form body itself. To search for a phrase, wrap the whole query in double quotes.
 

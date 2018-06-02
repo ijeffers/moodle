@@ -23,7 +23,7 @@
  * @package course
  */
 
-require_once(dirname(__FILE__) . '/../config.php');
+require_once(__DIR__ . '/../config.php');
 require_once($CFG->dirroot . '/course/lib.php');
 require_once($CFG->dirroot . '/course/request_form.php');
 
@@ -40,7 +40,7 @@ if ($return === 'management') {
 $PAGE->set_url($url);
 
 // Check permissions.
-require_login();
+require_login(null, false);
 if (isguestuser()) {
     print_error('guestsarenotallowed', '', $returnurl);
 }

@@ -24,7 +24,7 @@
 
 define('CLI_SCRIPT', true);
 
-require(dirname(dirname(dirname(__FILE__))).'/config.php');
+require(__DIR__.'/../../config.php');
 require_once($CFG->dirroot . '/mod/chat/lib.php');
 
 // Browser quirks.
@@ -104,7 +104,7 @@ class ChatDaemon {
         $this->_trace_level         = E_ALL ^ E_USER_NOTICE;
         $this->_pcntl_exists        = function_exists('pcntl_fork');
         $this->_time_rest_socket    = 20;
-        $this->_beepsoundsrc        = $GLOBALS['CFG']->wwwroot.'/mod/chat/beep.wav';
+        $this->_beepsoundsrc        = $GLOBALS['CFG']->wwwroot.'/mod/chat/beep.mp3';
         $this->_freq_update_records = 20;
         $this->_freq_poll_idle_chat = $GLOBALS['CFG']->chat_old_ping;
         $this->_stdout = fopen('php://stdout', 'w');
@@ -130,7 +130,10 @@ class ChatDaemon {
                     foreach ($chatroom['users'] as $sessionid => $userid) {
                         // We will be polling each user as required.
                         $this->trace('...shall we poll '.$sessionid.'?');
-                        if ($this->sets_info[$sessionid]['chatuser']->lastmessageping < $this->_last_idle_poll) {
+                        if (!empty($this->sets_info[$sessionid]) && isset($this->sets_info[$sessionid]['chatuser']) &&
+                                // Having tried to exclude race conditions as already done in user_lazy_update()
+                                // please do the real job by checking the last poll.
+                                ($this->sets_info[$sessionid]['chatuser']->lastmessageping < $this->_last_idle_poll)) {
                             $this->trace('YES!');
                             // This user hasn't been polled since his last message.
                             $result = $this->write_data($this->conn_sets[$sessionid][CHAT_CONNECTION_CHANNEL], '<!-- poll -->');
@@ -209,6 +212,11 @@ class ChatDaemon {
             return false;
         }
 
+        // Does promote_final() already finish its job?
+        if (!isset($this->sets_info[$sessionid]['lastinfocommit'])) {
+            return false;
+        }
+
         $now = time();
 
         // We 'll be cheating a little, and NOT updating the record data as
@@ -231,6 +239,7 @@ class ChatDaemon {
         $timenow = time();
 
         if (empty($str)) {
+            $str = new stdClass();
             $str->idle  = get_string("idle", "chat");
             $str->beep  = get_string("beep", "chat");
             $str->day   = get_string("day");
@@ -333,7 +342,7 @@ EOD;
                 $msg->chatid    = $this->sets_info[$sessionid]['chatid'];
                 $msg->userid    = $this->sets_info[$sessionid]['userid'];
                 $msg->groupid   = $this->sets_info[$sessionid]['groupid'];
-                $msg->system    = 0;
+                $msg->issystem  = 0;
                 $msg->message   = 'beep '.$customdata['beep'];
                 $msg->timestamp = time();
 
@@ -419,7 +428,7 @@ EOD;
                 $msg->chatid    = $this->sets_info[$sessionid]['chatid'];
                 $msg->userid    = $this->sets_info[$sessionid]['userid'];
                 $msg->groupid   = $this->sets_info[$sessionid]['groupid'];
-                $msg->system    = 0;
+                $msg->issystem  = 0;
                 $msg->message   = urldecode($customdata['message']); // Have to undo the browser's encoding.
                 $msg->timestamp = time();
 
@@ -561,7 +570,7 @@ EOD;
         $msg->chatid = $chatuser->chatid;
         $msg->userid = $chatuser->userid;
         $msg->groupid = $chatuser->groupid;
-        $msg->system = 1;
+        $msg->issystem = 1;
         $msg->message = 'enter';
         $msg->timestamp = time();
 
@@ -700,7 +709,12 @@ EOD;
         $monitor = array();
         if (!empty($this->conn_ufo)) {
             foreach ($this->conn_ufo as $ufoid => $ufo) {
-                $monitor[$ufoid] = $ufo->handle;
+                // Avoid socket_select() warnings by preventing the check over invalid resources.
+                if (is_resource($ufo->handle)) {
+                    $monitor[$ufoid] = $ufo->handle;
+                } else {
+                    $this->dismiss_ufo($ufo->handle, false);
+                }
             }
         }
 
@@ -735,21 +749,27 @@ EOD;
 
                 // Simply give them the message.
                 $output = chat_format_message_manually($message, $info['courseid'], $sender, $info['user']);
-                $this->trace('Delivering message "'.$output->text.'" to '.$this->conn_sets[$sessionid][CHAT_CONNECTION_CHANNEL]);
+                if ($output !== false) {
+                    $this->trace('Delivering message "'.$output->text.'" to ' .
+                        $this->conn_sets[$sessionid][CHAT_CONNECTION_CHANNEL]);
 
-                if ($output->beep) {
-                    $this->write_data($this->conn_sets[$sessionid][CHAT_CONNECTION_CHANNEL],
-                                      '<embed src="'.$this->_beepsoundsrc.'" autostart="true" hidden="true" />');
-                }
+                    if ($output->beep) {
+                        $playscript = '(function() { var audioElement = document.createElement("audio");' . "\n";
+                        $playscript .= 'audioElement.setAttribute("src", "'.$this->_beepsoundsrc.'");' . "\n";
+                        $playscript .= 'audioElement.play(); })();' . "\n";
+                        $this->write_data($this->conn_sets[$sessionid][CHAT_CONNECTION_CHANNEL],
+                                          '<script>' . $playscript . '</script>');
+                    }
 
-                if ($info['quirks'] & QUIRK_CHUNK_UPDATE) {
-                    $output->html .= $GLOBALS['CHAT_DUMMY_DATA'];
-                    $output->html .= $GLOBALS['CHAT_DUMMY_DATA'];
-                    $output->html .= $GLOBALS['CHAT_DUMMY_DATA'];
-                }
+                    if ($info['quirks'] & QUIRK_CHUNK_UPDATE) {
+                        $output->html .= $GLOBALS['CHAT_DUMMY_DATA'];
+                        $output->html .= $GLOBALS['CHAT_DUMMY_DATA'];
+                        $output->html .= $GLOBALS['CHAT_DUMMY_DATA'];
+                    }
 
-                if (!$this->write_data($this->conn_sets[$sessionid][CHAT_CONNECTION_CHANNEL], $output->html)) {
-                    $this->disconnect_session($sessionid);
+                    if (!$this->write_data($this->conn_sets[$sessionid][CHAT_CONNECTION_CHANNEL], $output->html)) {
+                        $this->disconnect_session($sessionid);
+                    }
                 }
             }
         }
@@ -765,7 +785,7 @@ EOD;
         $msg->chatid = $info['chatid'];
         $msg->userid = $info['userid'];
         $msg->groupid = $info['groupid'];
-        $msg->system = 1;
+        $msg->issystem = 1;
         $msg->message = 'exit';
         $msg->timestamp = time();
 
@@ -875,7 +895,9 @@ if (strpos($commandline, '-') === false) {
     $numswitches = count($switches);
 
     // Fancy way to give a "hyphen" boolean flag to each "switch".
-    $switches = array_map(create_function('$x', 'return array("str" => $x, "hyphen" => (substr($x, 0, 1) == "-"));'), $switches);
+    $switches = array_map(function($x) {
+        return array("str" => $x, "hyphen" => (substr($x, 0, 1) == "-"));
+    }, $switches);
 
     for ($i = 0; $i < $numswitches; ++$i) {
 
@@ -947,6 +969,12 @@ while (true) {
                 if (strlen($data) == 2048) { // If socket_read has more data, ignore all data.
                     $daemon->trace('UFO with '.$handle.': Data too long; connection closed', E_USER_WARNING);
                     $daemon->dismiss_ufo($handle, true, 'Data too long; connection closed');
+                    continue;
+                }
+
+                // Ignore desktop browser fake "favorite icon" requests.
+                if (strpos($data, 'GET /favicon.ico HTTP') === 0) {
+                    // Known malformed data, drop it without any further notice.
                     continue;
                 }
 

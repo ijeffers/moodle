@@ -67,6 +67,26 @@ class core_component {
     protected static $version = null;
     /** @var array list of the files to map. */
     protected static $filestomap = array('lib.php', 'settings.php');
+    /** @var array associative array of PSR-0 namespaces and corresponding paths. */
+    protected static $psr0namespaces = array(
+        'Horde' => 'lib/horde/framework/Horde',
+        'Mustache' => 'lib/mustache/src/Mustache',
+    );
+    /** @var array associative array of PRS-4 namespaces and corresponding paths. */
+    protected static $psr4namespaces = array(
+        'MaxMind' => 'lib/maxmind/MaxMind',
+        'GeoIp2' => 'lib/maxmind/GeoIp2',
+        'Sabberworm\\CSS' => 'lib/php-css-parser',
+        'MoodleHQ\\RTLCSS' => 'lib/rtlcss',
+        'Leafo\\ScssPhp' => 'lib/scssphp',
+        'Box\\Spout' => 'lib/spout/src/Spout',
+        'MatthiasMullie\\Minify' => 'lib/minify/matthiasmullie-minify/src/',
+        'MatthiasMullie\\PathConverter' => 'lib/minify/matthiasmullie-pathconverter/src/',
+        'IMSGlobal\LTI' => 'lib/ltiprovider/src',
+        'Phpml' => 'lib/mlbackend/php/phpml/src/Phpml',
+        'PHPMailer\\PHPMailer' => 'lib/phpmailer/src',
+        'RedeyeVentures\\GeoPattern' => 'lib/geopattern-php/GeoPattern',
+    );
 
     /**
      * Class loader for Frankenstyle named classes in standard locations.
@@ -98,10 +118,84 @@ class core_component {
             $newclassname = self::$classmaprenames[$classname];
             $debugging = "Class '%s' has been renamed for the autoloader and is now deprecated. Please use '%s' instead.";
             debugging(sprintf($debugging, $classname, $newclassname), DEBUG_DEVELOPER);
+            if (PHP_VERSION_ID >= 70000 && preg_match('#\\\null(\\\|$)#', $classname)) {
+                throw new \coding_exception("Cannot alias $classname to $newclassname");
+            }
             class_alias($newclassname, $classname);
             return;
         }
+
+        $file = self::psr_classloader($classname);
+        // If the file is found, require it.
+        if (!empty($file)) {
+            require($file);
+            return;
+        }
     }
+
+    /**
+     * Return the path to a class from our defined PSR-0 or PSR-4 standard namespaces on
+     * demand. Only returns paths to files that exist.
+     *
+     * Adapated from http://www.php-fig.org/psr/psr-4/examples/ and made PSR-0
+     * compatible.
+     *
+     * @param string $class the name of the class.
+     * @return string|bool The full path to the file defining the class. Or false if it could not be resolved or does not exist.
+     */
+    protected static function psr_classloader($class) {
+        // Iterate through each PSR-4 namespace prefix.
+        foreach (self::$psr4namespaces as $prefix => $path) {
+            $file = self::get_class_file($class, $prefix, $path, array('\\'));
+            if (!empty($file) && file_exists($file)) {
+                return $file;
+            }
+        }
+
+        // Iterate through each PSR-0 namespace prefix.
+        foreach (self::$psr0namespaces as $prefix => $path) {
+            $file = self::get_class_file($class, $prefix, $path, array('\\', '_'));
+            if (!empty($file) && file_exists($file)) {
+                return $file;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Return the path to the class based on the given namespace prefix and path it corresponds to.
+     *
+     * Will return the path even if the file does not exist. Check the file esists before requiring.
+     *
+     * @param string $class the name of the class.
+     * @param string $prefix The namespace prefix used to identify the base directory of the source files.
+     * @param string $path The relative path to the base directory of the source files.
+     * @param string[] $separators The characters that should be used for separating.
+     * @return string|bool The full path to the file defining the class. Or false if it could not be resolved.
+     */
+    protected static function get_class_file($class, $prefix, $path, $separators) {
+        global $CFG;
+
+        // Does the class use the namespace prefix?
+        $len = strlen($prefix);
+        if (strncmp($prefix, $class, $len) !== 0) {
+            // No, move to the next prefix.
+            return false;
+        }
+        $path = $CFG->dirroot . '/' . $path;
+
+        // Get the relative class name.
+        $relativeclass = substr($class, $len);
+
+        // Replace the namespace prefix with the base directory, replace namespace
+        // separators with directory separators in the relative class name, append
+        // with .php.
+        $file = $path . str_replace($separators, '/', $relativeclass) . '.php';
+
+        return $file;
+    }
+
 
     /**
      * Initialise caches, always call before accessing self:: caches.
@@ -324,6 +418,8 @@ $cache = '.var_export($cache, true).';
         $info = array(
             'access'      => null,
             'admin'       => $CFG->dirroot.'/'.$CFG->admin,
+            'analytics'   => $CFG->dirroot . '/analytics',
+            'antivirus'   => $CFG->dirroot . '/lib/antivirus',
             'auth'        => $CFG->dirroot.'/auth',
             'availability' => $CFG->dirroot . '/availability',
             'backup'      => $CFG->dirroot.'/backup/util/ui',
@@ -334,7 +430,9 @@ $cache = '.var_export($cache, true).';
             'cache'       => $CFG->dirroot.'/cache',
             'calendar'    => $CFG->dirroot.'/calendar',
             'cohort'      => $CFG->dirroot.'/cohort',
-            'completion'  => null,
+            'comment'     => $CFG->dirroot.'/comment',
+            'competency'  => $CFG->dirroot.'/competency',
+            'completion'  => $CFG->dirroot.'/completion',
             'countries'   => null,
             'course'      => $CFG->dirroot.'/course',
             'currencies'  => null,
@@ -345,8 +443,9 @@ $cache = '.var_export($cache, true).';
             'enrol'       => $CFG->dirroot.'/enrol',
             'error'       => null,
             'filepicker'  => null,
+            'fileconverter' => $CFG->dirroot.'/files/converter',
             'files'       => $CFG->dirroot.'/files',
-            'filters'     => null,
+            'filters'     => $CFG->dirroot.'/filter',
             //'fonts'       => null, // Bogus.
             'form'        => $CFG->dirroot.'/lib/form',
             'grades'      => $CFG->dirroot.'/grade',
@@ -360,7 +459,7 @@ $cache = '.var_export($cache, true).';
             'langconfig'  => null,
             'license'     => null,
             'mathslib'    => null,
-            'media'       => null,
+            'media'       => $CFG->dirroot.'/media',
             'message'     => $CFG->dirroot.'/message',
             'mimetypes'   => null,
             'mnet'        => $CFG->dirroot.'/mnet',
@@ -372,19 +471,18 @@ $cache = '.var_export($cache, true).';
             'plagiarism'  => $CFG->dirroot.'/plagiarism',
             'plugin'      => null,
             'portfolio'   => $CFG->dirroot.'/portfolio',
-            'publish'     => $CFG->dirroot.'/course/publish',
+            'privacy'     => $CFG->dirroot . '/privacy',
             'question'    => $CFG->dirroot.'/question',
             'rating'      => $CFG->dirroot.'/rating',
-            'register'    => $CFG->dirroot.'/'.$CFG->admin.'/registration', // Broken badly if $CFG->admin changed.
             'repository'  => $CFG->dirroot.'/repository',
             'rss'         => $CFG->dirroot.'/rss',
             'role'        => $CFG->dirroot.'/'.$CFG->admin.'/roles',
-            'search'      => null,
+            'search'      => $CFG->dirroot.'/search',
             'table'       => null,
             'tag'         => $CFG->dirroot.'/tag',
             'timezones'   => null,
             'user'        => $CFG->dirroot.'/user',
-            'userkey'     => null,
+            'userkey'     => $CFG->dirroot.'/lib/userkey',
             'webservice'  => $CFG->dirroot.'/webservice',
         );
 
@@ -399,6 +497,7 @@ $cache = '.var_export($cache, true).';
         global $CFG;
 
         $types = array(
+            'antivirus'     => $CFG->dirroot . '/lib/antivirus',
             'availability'  => $CFG->dirroot . '/availability/condition',
             'qtype'         => $CFG->dirroot.'/question/type',
             'mod'           => $CFG->dirroot.'/mod',
@@ -407,9 +506,11 @@ $cache = '.var_export($cache, true).';
             'enrol'         => $CFG->dirroot.'/enrol',
             'message'       => $CFG->dirroot.'/message/output',
             'block'         => $CFG->dirroot.'/blocks',
+            'media'         => $CFG->dirroot.'/media/player',
             'filter'        => $CFG->dirroot.'/filter',
             'editor'        => $CFG->dirroot.'/lib/editor',
             'format'        => $CFG->dirroot.'/course/format',
+            'dataformat'    => $CFG->dirroot.'/dataformat',
             'profilefield'  => $CFG->dirroot.'/user/profile/field',
             'report'        => $CFG->dirroot.'/report',
             'coursereport'  => $CFG->dirroot.'/course/report', // Must be after system reports.
@@ -417,16 +518,19 @@ $cache = '.var_export($cache, true).';
             'gradeimport'   => $CFG->dirroot.'/grade/import',
             'gradereport'   => $CFG->dirroot.'/grade/report',
             'gradingform'   => $CFG->dirroot.'/grade/grading/form',
+            'mlbackend'     => $CFG->dirroot.'/lib/mlbackend',
             'mnetservice'   => $CFG->dirroot.'/mnet/service',
             'webservice'    => $CFG->dirroot.'/webservice',
             'repository'    => $CFG->dirroot.'/repository',
             'portfolio'     => $CFG->dirroot.'/portfolio',
+            'search'        => $CFG->dirroot.'/search/engine',
             'qbehaviour'    => $CFG->dirroot.'/question/behaviour',
             'qformat'       => $CFG->dirroot.'/question/format',
             'plagiarism'    => $CFG->dirroot.'/plagiarism',
             'tool'          => $CFG->dirroot.'/'.$CFG->admin.'/tool',
             'cachestore'    => $CFG->dirroot.'/cache/stores',
             'cachelock'     => $CFG->dirroot.'/cache/locks',
+            'fileconverter' => $CFG->dirroot.'/files/converter',
         );
         $parents = array();
         $subplugins = array();
@@ -591,6 +695,7 @@ $cache = '.var_export($cache, true).';
                 self::load_classes($plugintype.'_'.$pluginname, "$fulldir/classes");
             }
         }
+        ksort(self::$classmap);
     }
 
     /**
@@ -632,6 +737,13 @@ $cache = '.var_export($cache, true).';
             return;
         }
 
+        if (!is_readable($fulldir)) {
+            // TODO: MDL-51711 We should generate some diagnostic debugging information in this case
+            // because its pretty likely to lead to a missing class error further down the line.
+            // But our early setup code can't handle errors this early at the moment.
+            return;
+        }
+
         $items = new \DirectoryIterator($fulldir);
         foreach ($items as $item) {
             if ($item->isDot()) {
@@ -660,6 +772,7 @@ $cache = '.var_export($cache, true).';
         unset($item);
         unset($items);
     }
+
 
     /**
      * List all core subsystems and their location
@@ -800,6 +913,45 @@ $cache = '.var_export($cache, true).';
     }
 
     /**
+     * Returns all classes in a component matching the provided namespace.
+     *
+     * It checks that the class exists.
+     *
+     * e.g. get_component_classes_in_namespace('mod_forum', 'event')
+     *
+     * @param string $component A valid moodle component (frankenstyle)
+     * @param string $namespace Namespace from the component name or empty if all $component namespace classes.
+     * @return array The full class name as key and the class path as value.
+     */
+    public static function get_component_classes_in_namespace($component, $namespace = '') {
+
+        $component = self::normalize_componentname($component);
+
+        if ($namespace) {
+
+            // We will add them later.
+            $namespace = trim($namespace, '\\');
+
+            // We need add double backslashes as it is how classes are stored into self::$classmap.
+            $namespace = implode('\\\\', explode('\\', $namespace));
+            $namespace = $namespace . '\\\\';
+        }
+
+        $regex = '|^' . $component . '\\\\' . $namespace . '|';
+        $it = new RegexIterator(new ArrayIterator(self::$classmap), $regex, RegexIterator::GET_MATCH, RegexIterator::USE_KEY);
+
+        // We want to be sure that they exist.
+        $classes = array();
+        foreach ($it as $classname => $classpath) {
+            if (class_exists($classname)) {
+                $classes[$classname] = $classpath;
+            }
+        }
+
+        return $classes;
+    }
+
+    /**
      * Returns the exact absolute path to plugin directory.
      *
      * @param string $plugintype type of plugin
@@ -862,12 +1014,28 @@ $cache = '.var_export($cache, true).';
     }
 
     /**
+     * Normalize the component name.
+     *
+     * Note: this does not verify the validity of the plugin or component.
+     *
+     * @param string $component
+     * @return string
+     */
+    public static function normalize_componentname($componentname) {
+        list($plugintype, $pluginname) = self::normalize_component($componentname);
+        if ($plugintype === 'core' && is_null($pluginname)) {
+            return $plugintype;
+        }
+        return $plugintype . '_' . $pluginname;
+    }
+
+    /**
      * Normalize the component name using the "frankenstyle" rules.
      *
      * Note: this does not verify the validity of plugin or type names.
      *
      * @param string $component
-     * @return array as (string)$type => (string)$plugin
+     * @return array two-items list of [(string)type, (string|null)name]
      */
     public static function normalize_component($component) {
         if ($component === 'moodle' or $component === 'core' or $component === '') {
@@ -998,7 +1166,7 @@ $cache = '.var_export($cache, true).';
                 $plugin = new stdClass();
                 $plugin->version = null;
                 $module = $plugin;
-                @include($fullplug.'/version.php');
+                include($fullplug.'/version.php');
                 $versions[$type.'_'.$plug] = $plugin->version;
             }
         }
@@ -1074,5 +1242,39 @@ $cache = '.var_export($cache, true).';
                 }
             }
         }
+    }
+
+    /**
+     * Returns a list of frankenstyle component names and their paths, for all components (plugins and subsystems).
+     *
+     * E.g.
+     *  [
+     *      'mod' => [
+     *          'mod_forum' => FORUM_PLUGIN_PATH,
+     *          ...
+     *      ],
+     *      ...
+     *      'core' => [
+     *          'core_comment' => COMMENT_SUBSYSTEM_PATH,
+     *          ...
+     *      ]
+     * ]
+     *
+     * @return array an associative array of components and their corresponding paths.
+     */
+    public static function get_component_list() : array {
+        $components = [];
+        // Get all plugins.
+        foreach (self::get_plugin_types() as $plugintype => $typedir) {
+            $components[$plugintype] = [];
+            foreach (self::get_plugin_list($plugintype) as $pluginname => $plugindir) {
+                $components[$plugintype][$plugintype . '_' . $pluginname] = $plugindir;
+            }
+        }
+        // Get all subsystems.
+        foreach (self::get_core_subsystems() as $subsystemname => $subsystempath) {
+            $components['core']['core_' . $subsystemname] = $subsystempath;
+        }
+        return $components;
     }
 }

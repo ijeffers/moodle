@@ -24,7 +24,7 @@ $id = required_param('id', PARAM_INT); // course id
 $PAGE->set_url('/grade/export/ods/index.php', array('id'=>$id));
 
 if (!$course = $DB->get_record('course', array('id'=>$id))) {
-    print_error('nocourseid');
+    print_error('invalidcourseid');
 }
 
 require_login($course);
@@ -43,7 +43,8 @@ if (!empty($CFG->gradepublishing)) {
 $actionurl = new moodle_url('/grade/export/ods/export.php');
 $formoptions = array(
     'publishing' => true,
-    'simpleui' => true
+    'simpleui' => true,
+    'multipledisplaytypes' => true
 );
 
 $mform = new grade_export_form($actionurl, $formoptions);

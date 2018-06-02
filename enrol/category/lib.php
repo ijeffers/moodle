@@ -42,7 +42,7 @@ class enrol_category_plugin extends enrol_plugin {
         global $DB;
 
         $context = context_course::instance($instance->courseid);
-        if (!has_capability('enrol/database:config', $context)) {
+        if (!has_capability('enrol/category:config', $context)) {
             return false;
         }
 
@@ -54,6 +54,17 @@ class enrol_category_plugin extends enrol_plugin {
     }
 
     /**
+     * Is it possible to hide/show enrol instance via standard UI?
+     *
+     * @param stdClass $instance
+     * @return bool
+     */
+    public function can_hide_show_instance($instance) {
+        $context = context_course::instance($instance->courseid);
+        return has_capability('enrol/category:config', $context);
+    }
+
+    /**
      * Returns link to page which may be used to add new instance of enrolment plugin in course.
      * @param int $courseid
      * @return moodle_url page url
@@ -61,22 +72,6 @@ class enrol_category_plugin extends enrol_plugin {
     public function get_newinstance_link($courseid) {
         // Instances are added automatically as necessary.
         return null;
-    }
-
-    /**
-     * Called for all enabled enrol plugins that returned true from is_cron_required().
-     * @return void
-     */
-    public function cron() {
-        global $CFG;
-
-        if (!enrol_is_enabled('category')) {
-            return;
-        }
-
-        require_once("$CFG->dirroot/enrol/category/locallib.php");
-        $trace = new null_progress_trace();
-        enrol_category_sync_full($trace);
     }
 
     /**

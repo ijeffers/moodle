@@ -88,6 +88,9 @@ class mysql_sql_generator extends sql_generator {
     /** @var string SQL sentence to rename one key 'TABLENAME', 'OLDKEYNAME' and 'NEWKEYNAME' are dynamically replaced.*/
     public $rename_key_sql = null;
 
+    /** Maximum size of InnoDB row in Antelope file format */
+    const ANTELOPE_MAX_ROW_SIZE = 8126;
+
     /**
      * Reset a sequence to the id field of a table.
      *
@@ -109,6 +112,90 @@ class mysql_sql_generator extends sql_generator {
     }
 
     /**
+     * Calculate proximate row size when using InnoDB
+     * tables in Antelope row format.
+     *
+     * Note: the returned value is a bit higher to compensate for
+     *       errors and changes of column data types.
+     *
+     * @deprecated since Moodle 2.9 MDL-49723 - please do not use this function any more.
+     */
+    public function guess_antolope_row_size(array $columns) {
+        throw new coding_exception('guess_antolope_row_size() can not be used any more, please use guess_antelope_row_size() instead.');
+    }
+
+    /**
+     * Calculate proximate row size when using InnoDB tables in Antelope row format.
+     *
+     * Note: the returned value is a bit higher to compensate for errors and changes of column data types.
+     *
+     * @param xmldb_field[]|database_column_info[] $columns
+     * @return int approximate row size in bytes
+     */
+    public function guess_antelope_row_size(array $columns) {
+
+        if (empty($columns)) {
+            return 0;
+        }
+
+        $size = 0;
+        $first = reset($columns);
+
+        if (count($columns) > 1) {
+            // Do not start with zero because we need to cover changes of field types and
+            // this calculation is most probably not be accurate.
+            $size += 1000;
+        }
+
+        if ($first instanceof xmldb_field) {
+            foreach ($columns as $field) {
+                switch ($field->getType()) {
+                    case XMLDB_TYPE_TEXT:
+                        $size += 768;
+                        break;
+                    case XMLDB_TYPE_BINARY:
+                        $size += 768;
+                        break;
+                    case XMLDB_TYPE_CHAR:
+                        $bytes = $field->getLength() * 3;
+                        if ($bytes > 768) {
+                            $bytes = 768;
+                        }
+                        $size += $bytes;
+                        break;
+                    default:
+                        // Anything else is usually maximum 8 bytes.
+                        $size += 8;
+                }
+            }
+
+        } else if ($first instanceof database_column_info) {
+            foreach ($columns as $column) {
+                switch ($column->meta_type) {
+                    case 'X':
+                        $size += 768;
+                        break;
+                    case 'B':
+                        $size += 768;
+                        break;
+                    case 'C':
+                        $bytes = $column->max_length * 3;
+                        if ($bytes > 768) {
+                            $bytes = 768;
+                        }
+                        $size += $bytes;
+                        break;
+                    default:
+                        // Anything else is usually maximum 8 bytes.
+                        $size += 8;
+                }
+            }
+        }
+
+        return $size;
+    }
+
+    /**
      * Given one correct xmldb_table, returns the SQL statements
      * to create it (inside one array).
      *
@@ -121,6 +208,18 @@ class mysql_sql_generator extends sql_generator {
         $engine = $this->mdb->get_dbengine();
         // Do we know collation?
         $collation = $this->mdb->get_dbcollation();
+
+        // Do we need to use compressed format for rows?
+        $rowformat = "";
+        $size = $this->guess_antelope_row_size($xmldb_table->getFields());
+        if ($size > self::ANTELOPE_MAX_ROW_SIZE) {
+            if ($this->mdb->is_compressed_row_format_supported()) {
+                $rowformat = "\n ROW_FORMAT=Compressed";
+            }
+        }
+
+        $utf8mb4rowformat = $this->mdb->get_row_format_sql($engine, $collation);
+        $rowformat = ($utf8mb4rowformat == '') ? $rowformat : $utf8mb4rowformat;
 
         $sqlarr = parent::getCreateTableSQL($xmldb_table);
 
@@ -142,7 +241,10 @@ class mysql_sql_generator extends sql_generator {
                     if (strpos($collation, 'utf8_') === 0) {
                         $sql .= "\n DEFAULT CHARACTER SET utf8";
                     }
-                    $sql .= "\n DEFAULT COLLATE = $collation";
+                    $sql .= "\n DEFAULT COLLATE = $collation ";
+                }
+                if ($rowformat) {
+                    $sql .= $rowformat;
                 }
                 $sqls[] = $sql;
                 continue;
@@ -187,6 +289,60 @@ class mysql_sql_generator extends sql_generator {
     }
 
     /**
+     * Given one xmldb_table and one xmldb_field, return the SQL statements needed to add the field to the table.
+     *
+     * @param xmldb_table $xmldb_table The table related to $xmldb_field.
+     * @param xmldb_field $xmldb_field The instance of xmldb_field to create the SQL from.
+     * @param string $skip_type_clause The type clause on alter columns, NULL by default.
+     * @param string $skip_default_clause The default clause on alter columns, NULL by default.
+     * @param string $skip_notnull_clause The null/notnull clause on alter columns, NULL by default.
+     * @return array The SQL statement for adding a field to the table.
+     */
+    public function getAddFieldSQL($xmldb_table, $xmldb_field, $skip_type_clause = NULL, $skip_default_clause = NULL, $skip_notnull_clause = NULL) {
+        $sqls = parent::getAddFieldSQL($xmldb_table, $xmldb_field, $skip_type_clause, $skip_default_clause, $skip_notnull_clause);
+
+        if ($this->table_exists($xmldb_table)) {
+            $tablename = $xmldb_table->getName();
+
+            $size = $this->guess_antelope_row_size($this->mdb->get_columns($tablename));
+            $size += $this->guess_antelope_row_size(array($xmldb_field));
+
+            if ($size > self::ANTELOPE_MAX_ROW_SIZE) {
+                if ($this->mdb->is_compressed_row_format_supported()) {
+                    $format = strtolower($this->mdb->get_row_format($tablename));
+                    if ($format === 'compact' or $format === 'redundant') {
+                        // Change the format before conversion so that we do not run out of space.
+                        array_unshift($sqls, "ALTER TABLE {$this->prefix}$tablename ROW_FORMAT=Compressed");
+                    }
+                }
+            }
+        }
+
+        return $sqls;
+    }
+
+    public function getAlterFieldSQL($xmldb_table, $xmldb_field, $skip_type_clause = NULL, $skip_default_clause = NULL, $skip_notnull_clause = NULL)
+    {
+        $tablename = $xmldb_table->getName();
+        $dbcolumnsinfo = $this->mdb->get_columns($tablename);
+
+        if (($this->mdb->has_breaking_change_sqlmode()) &&
+            ($dbcolumnsinfo[$xmldb_field->getName()]->meta_type == 'X') &&
+            ($xmldb_field->getType() == XMLDB_TYPE_INTEGER)) {
+            // Ignore 1292 ER_TRUNCATED_WRONG_VALUE Truncated incorrect INTEGER value: '%s'.
+            $altercolumnsqlorig = $this->alter_column_sql;
+            $this->alter_column_sql = str_replace('ALTER TABLE', 'ALTER IGNORE TABLE', $this->alter_column_sql);
+            $result = parent::getAlterFieldSQL($xmldb_table, $xmldb_field, $skip_type_clause, $skip_default_clause, $skip_notnull_clause);
+            // Restore the original ALTER SQL statement pattern.
+            $this->alter_column_sql = $altercolumnsqlorig;
+
+            return $result;
+        }
+
+        return parent::getAlterFieldSQL($xmldb_table, $xmldb_field, $skip_type_clause, $skip_default_clause, $skip_notnull_clause);
+    }
+
+    /**
      * Given one correct xmldb_table, returns the SQL statements
      * to create temporary table (inside one array).
      *
@@ -209,7 +365,7 @@ class mysql_sql_generator extends sql_generator {
                     if (strpos($collation, 'utf8_') === 0) {
                         $sqlarr[$i] .= " DEFAULT CHARACTER SET utf8";
                     }
-                    $sqlarr[$i] .= " DEFAULT COLLATE $collation";
+                    $sqlarr[$i] .= " DEFAULT COLLATE $collation ROW_FORMAT=DYNAMIC";
                 }
             }
         }
@@ -433,9 +589,9 @@ class mysql_sql_generator extends sql_generator {
      * @return array An array of database specific reserved words
      */
     public static function getReservedWords() {
-        // This file contains the reserved words for MySQL databases
-        // from http://dev.mysql.com/doc/refman/6.0/en/reserved-words.html
+        // This file contains the reserved words for MySQL databases.
         $reserved_words = array (
+            // From http://dev.mysql.com/doc/refman/6.0/en/reserved-words.html.
             'accessible', 'add', 'all', 'alter', 'analyze', 'and', 'as', 'asc',
             'asensitive', 'before', 'between', 'bigint', 'binary',
             'blob', 'both', 'by', 'call', 'cascade', 'case', 'change',
@@ -475,7 +631,13 @@ class mysql_sql_generator extends sql_generator {
             'upgrade', 'usage', 'use', 'using', 'utc_date', 'utc_time',
             'utc_timestamp', 'values', 'varbinary', 'varchar', 'varcharacter',
             'varying', 'when', 'where', 'while', 'with', 'write', 'x509',
-            'xor', 'year_month', 'zerofill'
+            'xor', 'year_month', 'zerofill',
+            // Added in MySQL 8.0, compared to MySQL 5.7:
+            // https://dev.mysql.com/doc/refman/8.0/en/keywords.html#keywords-new-in-current-series.
+            '_filename', 'admin', 'cume_dist', 'dense_rank', 'empty', 'except', 'first_value', 'grouping', 'groups',
+            'json_table', 'lag', 'last_value', 'lead', 'nth_value', 'ntile',
+            'of', 'over', 'percent_rank', 'persist', 'persist_only', 'rank', 'recursive', 'row_number',
+            'system', 'window'
         );
         return $reserved_words;
     }

@@ -85,7 +85,7 @@ class cachestore_mongodb extends cache_store implements cache_is_configurable {
      * Determines if and what safe setting is to be used.
      * @var bool|int
      */
-    protected $usesafe = false;
+    protected $usesafe = true;
 
     /**
      * If set to true then multiple identifiers will be requested and used.
@@ -175,7 +175,7 @@ class cachestore_mongodb extends cache_store implements cache_is_configurable {
      * @return int
      */
     public static function get_supported_features(array $configuration = array()) {
-        $supports = self::SUPPORTS_DATA_GUARANTEE;
+        $supports = self::SUPPORTS_DATA_GUARANTEE + self::DEREFERENCES_OBJECTS;
         if (array_key_exists('extendedmode', $configuration) && $configuration['extendedmode']) {
             $supports += self::SUPPORTS_MULTIPLE_IDENTIFIERS;
         }
@@ -556,6 +556,9 @@ class cachestore_mongodb extends cache_store implements cache_is_configurable {
         }
 
         $store = new cachestore_mongodb('Test mongodb', $configuration);
+        if (!$store->is_ready()) {
+            return false;
+        }
         $store->initialise($definition);
 
         return $store;
@@ -568,22 +571,16 @@ class cachestore_mongodb extends cache_store implements cache_is_configurable {
      * @param cache_definition $definition
      * @return false
      */
-    public static function initialise_unit_test_instance(cache_definition $definition) {
-        if (!self::are_requirements_met()) {
-            return false;
-        }
-        if (!defined('TEST_CACHESTORE_MONGODB_TESTSERVER')) {
-            return false;
-        }
-
+    public static function unit_test_configuration() {
         $configuration = array();
-        $configuration['servers'] = explode("\n", TEST_CACHESTORE_MONGODB_TESTSERVER);
         $configuration['usesafe'] = 1;
 
-        $store = new cachestore_mongodb('Test mongodb', $configuration);
-        $store->initialise($definition);
+        // If the configuration is not defined correctly, return only the configuration know about.
+        if (defined('TEST_CACHESTORE_MONGODB_TESTSERVER')) {
+            $configuration['servers'] = explode("\n", TEST_CACHESTORE_MONGODB_TESTSERVER);
+        }
 
-        return $store;
+        return $configuration;
     }
 
     /**
@@ -592,5 +589,17 @@ class cachestore_mongodb extends cache_store implements cache_is_configurable {
      */
     public function my_name() {
         return $this->name;
+    }
+
+    /**
+     * Returns true if this cache store instance is both suitable for testing, and ready for testing.
+     *
+     * Cache stores that support being used as the default store for unit and acceptance testing should
+     * override this function and return true if there requirements have been met.
+     *
+     * @return bool
+     */
+    public static function ready_to_be_used_for_testing() {
+        return defined('TEST_CACHESTORE_MONGODB_TESTSERVER');
     }
 }

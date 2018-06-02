@@ -61,7 +61,7 @@ Y.extend(FetchLogs, Y.Base, {
 
     /**
      * Initializer.
-     * Basic setup and delegations.
+     * Basic setup and event listeners.
      *
      * @method initializer
      */
@@ -74,7 +74,7 @@ Y.extend(FetchLogs, Y.Base, {
         this.spinner = Y.one(SELECTORS.SPINNER);
         this.pauseButton = Y.one(SELECTORS.PAUSEBUTTON);
         this.spinner.hide();
-        Y.delegate('click', this.toggleUpdate, 'button', SELECTORS.PAUSEBUTTON, this);
+        Y.one(SELECTORS.PAUSEBUTTON).on('click', this.toggleUpdate, this);
     },
 
     /**
@@ -108,7 +108,8 @@ Y.extend(FetchLogs, Y.Base, {
      * @method updateLogTable
      */
     updateLogTable: function(tid, response) {
-        Y.later(600, this, 'hideLoadingIcon'); // Hide loading icon, give sometime to people to actually see it. We should do it, event in case of an error.
+        // Hide loading icon, give sometime to people to actually see it. We should do it, event in case of an error.
+        Y.later(600, this, 'hideLoadingIcon');
         var responseobject;
         // Attempt to parse the response into an object.
         try {
@@ -125,7 +126,7 @@ Y.extend(FetchLogs, Y.Base, {
             });
             return this;
         }
-        this.set('since' , responseobject.until);
+        this.set('since', responseobject.until);
         var logs = responseobject.logs;
         var tbody = Y.one(SELECTORS.TBODY);
         var firstTr = null;
@@ -134,7 +135,8 @@ Y.extend(FetchLogs, Y.Base, {
             if (firstTr) {
                 tbody.insertBefore(logs, firstTr);
             }
-            // @Todo, when no data is present our library should generate an empty table. so data can be added dynamically (MDL-44525).
+            // @Todo, when no data is present our library should generate an empty table. so data can be added
+            // dynamically (MDL-44525).
 
             // Let us chop off some data from end of table to prevent really long pages.
             var oldChildren = tbody.get('children').slice(this.get('perpage'));
